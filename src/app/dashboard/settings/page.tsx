@@ -4,7 +4,12 @@ import { SUPPORTED_CURRENCIES } from "@/lib/currency";
 import type { Profile } from "@/lib/types";
 import { saveProfile } from "../actions";
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ saved?: string }>;
+}) {
+  const { saved } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -22,7 +27,14 @@ export default async function SettingsPage() {
 
   return (
     <div className="flex max-w-xl flex-col gap-8">
-      <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">Settings</h1>
+      <div className="flex items-center gap-3">
+        <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">Settings</h1>
+        {saved === "1" && (
+          <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
+            Saved ✓
+          </span>
+        )}
+      </div>
 
       <form
         action={saveProfile}
