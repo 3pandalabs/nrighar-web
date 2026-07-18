@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
   const router = useRouter();
+  const [role, setRole] = useState<"owner" | "tenant">("owner");
   const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -19,19 +20,41 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     const supabase = createClient();
-    const { error } =
-      mode === "sign-in"
-        ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password });
 
-    setIsSubmitting(false);
-
-    if (error) {
-      setError(error.message);
+    if (mode === "sign-up") {
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) {
+        setError(error.message);
+        setIsSubmitting(false);
+        return;
+      }
+      if (data.user) {
+        await supabase.from("profiles").upsert({ id: data.user.id, role });
+        if (role === "tenant") {
+          await supabase.from("tenant_profiles").upsert({ user_id: data.user.id, full_name: "", email });
+        }
+      }
+      router.push(role === "tenant" ? "/tenant" : "/dashboard");
+      router.refresh();
       return;
     }
 
-    router.push("/dashboard");
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      setError(error.message);
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Route by the account's actual role, not the toggle — the toggle is a
+    // hint for sign-up; existing accounts go where they belong.
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", data.user.id)
+      .maybeSingle();
+
+    router.push(profile?.role === "tenant" ? "/tenant" : "/dashboard");
     router.refresh();
   }
 
@@ -45,9 +68,26 @@ export default function LoginPage() {
         onSubmit={handleSubmit}
         className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-8 dark:border-zinc-800 dark:bg-zinc-950"
       >
-        <h1 className="mb-6 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+        <h1 className="mb-4 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
           {mode === "sign-in" ? "Sign in" : "Create an account"}
         </h1>
+
+        <div className="mb-6 grid grid-cols-2 gap-1 rounded-full bg-zinc-100 p-1 dark:bg-zinc-900">
+          {(["owner", "tenant"] as const).map((r) => (
+            <button
+              key={r}
+              type="button"
+              onClick={() => setRole(r)}
+              className={
+                role === r
+                  ? "rounded-full bg-white px-4 py-1.5 text-sm font-medium text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-50"
+                  : "rounded-full px-4 py-1.5 text-sm text-zinc-500"
+              }
+            >
+              {r === "owner" ? "I'm an owner" : "I'm a tenant"}
+            </button>
+          ))}
+        </div>
 
         <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
           Email

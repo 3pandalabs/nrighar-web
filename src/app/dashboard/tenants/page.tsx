@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import type { IntakeLink, Property, Tenant } from "@/lib/types";
 import { addTenant, createIntakeLink, deleteIntakeLink } from "../actions";
@@ -35,7 +36,17 @@ export default async function TenantsPage() {
           {tenants.map((tenant) => (
             <li key={tenant.id} className="flex items-center justify-between px-4 py-3 text-sm">
               <span>
-                <span className="font-medium text-zinc-900 dark:text-zinc-50">{tenant.full_name}</span>
+                <Link
+                  href={`/dashboard/tenants/${tenant.id}`}
+                  className="font-medium text-zinc-900 underline-offset-2 hover:underline dark:text-zinc-50"
+                >
+                  {tenant.full_name}
+                </Link>
+                {tenant.tenant_user_id && (
+                  <span className="ml-2 rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400">
+                    profile linked
+                  </span>
+                )}
                 <span className="ml-3 text-zinc-500">
                   {[tenant.phone, tenant.email].filter(Boolean).join(" · ")}
                 </span>

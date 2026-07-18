@@ -5,6 +5,37 @@ export type Profile = {
   preferred_currency: string;
   upi_vpa: string | null;
   upi_name: string | null;
+  role: "owner" | "tenant";
+};
+
+export type TenantProfile = {
+  user_id: string;
+  full_name: string;
+  phone: string | null;
+  email: string | null;
+  current_city: string | null;
+  employer: string | null;
+  kyc_status: "pending" | "submitted" | "verified";
+  created_at: string;
+};
+
+export type TenantDocument = {
+  id: string;
+  tenant_user_id: string;
+  doc_type: "agreement" | "kyc" | "property_paper" | "tax" | "other";
+  title: string;
+  storage_path: string;
+  created_at: string;
+};
+
+export type ProfileShare = {
+  id: string;
+  tenant_user_id: string;
+  owner_id: string | null;
+  status: "open" | "claimed" | "revoked";
+  created_at: string;
+  claimed_at: string | null;
+  revoked_at: string | null;
 };
 
 export type PayLink = {
@@ -41,6 +72,7 @@ export type Tenant = {
   email: string | null;
   kyc_status: "pending" | "submitted" | "verified";
   notes: string | null;
+  tenant_user_id: string | null;
   created_at: string;
 };
 
