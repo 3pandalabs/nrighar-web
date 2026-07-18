@@ -20,6 +20,7 @@ export type Tenant = {
   email: string | null;
   kyc_status: "pending" | "submitted" | "verified";
   notes: string | null;
+  tenant_user_id: string | null;
   created_at: string;
 };
 
@@ -49,6 +50,37 @@ export type RentPayment = {
   method: "bank_transfer" | "upi" | "cash" | "other" | null;
   status: "due" | "paid" | "partial";
   notes: string | null;
+};
+
+export type IntakeLink = {
+  id: string;
+  owner_id: string;
+  property_id: string | null;
+  status: "pending" | "submitted";
+  tenant_id: string | null;
+  created_at: string;
+  submitted_at: string | null;
+  expires_at: string;
+};
+
+export type TenantProfile = {
+  user_id: string;
+  full_name: string;
+  phone: string | null;
+  email: string | null;
+  current_city: string | null;
+  employer: string | null;
+  kyc_status: "pending" | "submitted" | "verified";
+  created_at: string;
+};
+
+export type TenantDocument = {
+  id: string;
+  tenant_user_id: string;
+  doc_type: "agreement" | "kyc" | "property_paper" | "tax" | "other";
+  title: string;
+  storage_path: string;
+  created_at: string;
 };
 
 export type PayLink = {

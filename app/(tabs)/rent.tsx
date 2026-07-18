@@ -3,6 +3,7 @@ import { useFocusEffect } from "expo-router";
 import { Alert, FlatList, Linking, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useAuth } from "../../hooks/useAuth";
 import { supabase } from "../../lib/supabase";
+import { SITE_URL } from "../../lib/constants";
 import {
   formatInr,
   type Lease,
@@ -11,8 +12,6 @@ import {
   type RentPayment,
   type Tenant,
 } from "../../lib/types";
-
-const SITE_URL = "https://nrighar.3pandalabs.com";
 
 export default function RentScreen() {
   const { session } = useAuth();
