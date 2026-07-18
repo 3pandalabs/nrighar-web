@@ -3,6 +3,20 @@ export type Profile = {
   display_name: string | null;
   country_of_residence: string | null;
   preferred_currency: string;
+  upi_vpa: string | null;
+  upi_name: string | null;
+};
+
+export type PayLink = {
+  id: string;
+  owner_id: string;
+  lease_id: string;
+  period_year: number;
+  period_month: number;
+  amount_due: number;
+  opened_at: string | null;
+  claimed_paid_at: string | null;
+  created_at: string;
 };
 
 export type Property = {

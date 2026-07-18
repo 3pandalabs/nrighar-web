@@ -46,6 +46,23 @@ export default async function SettingsPage() {
           />
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          UPI ID (for tenant pay links — usually your NRO account&apos;s UPI)
+          <input
+            name="upi_vpa"
+            defaultValue={profile?.upi_vpa ?? ""}
+            placeholder="e.g. name@oksbi"
+            className="rounded-lg border border-zinc-300 px-3 py-2 text-sm font-normal dark:border-zinc-700 dark:bg-zinc-900"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          Name on UPI (shown to tenants when paying)
+          <input
+            name="upi_name"
+            defaultValue={profile?.upi_name ?? ""}
+            className="rounded-lg border border-zinc-300 px-3 py-2 text-sm font-normal dark:border-zinc-700 dark:bg-zinc-900"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
           Home currency (for approximate conversions)
           <select
             name="preferred_currency"

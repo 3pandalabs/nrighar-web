@@ -148,6 +148,8 @@ export async function saveProfile(formData: FormData) {
     display_name: String(formData.get("display_name") ?? "").trim() || null,
     country_of_residence: String(formData.get("country_of_residence") ?? "").trim() || null,
     preferred_currency: String(formData.get("preferred_currency") ?? "USD"),
+    upi_vpa: String(formData.get("upi_vpa") ?? "").trim() || null,
+    upi_name: String(formData.get("upi_name") ?? "").trim() || null,
   });
 
   if (error) {
@@ -156,6 +158,67 @@ export async function saveProfile(formData: FormData) {
 
   revalidatePath("/dashboard");
   revalidatePath("/dashboard/settings");
+}
+
+export async function sendWhatsAppReminder(formData: FormData) {
+  const { supabase, user } = await requireUser();
+
+  const leaseId = String(formData.get("lease_id") ?? "");
+  const periodYear = Number(formData.get("period_year") ?? 0);
+  const periodMonth = Number(formData.get("period_month") ?? 0);
+  const amount = Number(formData.get("amount") ?? 0);
+  const phone = String(formData.get("phone") ?? "");
+  const tenantName = String(formData.get("tenant_name") ?? "");
+  const propertyNickname = String(formData.get("property_nickname") ?? "");
+  const monthLabel = String(formData.get("month_label") ?? "");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("upi_vpa")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  // A pay link is only useful if the owner has a UPI ID for the page to show.
+  let payLinkUrl: string | null = null;
+  if (profile?.upi_vpa) {
+    const { data: payLink, error } = await supabase
+      .from("pay_links")
+      .upsert(
+        {
+          owner_id: user.id,
+          lease_id: leaseId,
+          period_year: periodYear,
+          period_month: periodMonth,
+          amount_due: amount,
+        },
+        { onConflict: "lease_id,period_year,period_month" }
+      )
+      .select("id")
+      .single();
+
+    if (error) {
+      throw new Error(`Could not create pay link: ${error.message}`);
+    }
+
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://nrighar.3pandalabs.com";
+    payLinkUrl = `${siteUrl}/pay/${payLink.id}`;
+    revalidatePath("/dashboard/rent");
+  }
+
+  const rupees = new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 0,
+  }).format(amount);
+
+  const message = payLinkUrl
+    ? `Hi ${tenantName}, hope you're doing well! A gentle reminder that the rent of ${rupees} for ${propertyNickname} for ${monthLabel} is due. You can pay via UPI here: ${payLinkUrl} — it opens your UPI app with my details filled in. Thank you!`
+    : `Hi ${tenantName}, hope you're doing well! A gentle reminder that the rent of ${rupees} for ${propertyNickname} for ${monthLabel} is due. Please let me know once it's transferred. Thank you!`;
+
+  const digits = phone.replace(/\D/g, "");
+  const withCountry = digits.length === 10 ? `91${digits}` : digits;
+
+  redirect(`https://wa.me/${withCountry}?text=${encodeURIComponent(message)}`);
 }
 
 export async function deleteDocument(formData: FormData) {
