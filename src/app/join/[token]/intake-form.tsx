@@ -13,9 +13,37 @@ export function IntakeForm({ token }: { token: string }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [done, setDone] = useState(false);
 
+  const MAX_FILES = 6;
+  const MAX_FILE_MB = 10;
+  // Supabase's gateway rejects requests over ~20 MB before they reach the
+  // function, with an opaque non-CORS error — so enforce a total cap here
+  // where we can still explain it.
+  const MAX_TOTAL_MB = 18;
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    const selected = Array.from(files ?? []);
+    if (selected.length > MAX_FILES) {
+      setError(`Please attach at most ${MAX_FILES} files.`);
+      return;
+    }
+    const tooBig = selected.find((f) => f.size > MAX_FILE_MB * 1024 * 1024);
+    if (tooBig) {
+      setError(
+        `${tooBig.name} is ${(tooBig.size / 1024 / 1024).toFixed(1)} MB — the limit is ${MAX_FILE_MB} MB per file. Phone photos can be large; try choosing a smaller size when attaching, or use a PDF scan.`
+      );
+      return;
+    }
+    const totalMb = selected.reduce((sum, f) => sum + f.size, 0) / 1024 / 1024;
+    if (totalMb > MAX_TOTAL_MB) {
+      setError(
+        `Your files add up to ${totalMb.toFixed(1)} MB — please keep the total under ${MAX_TOTAL_MB} MB. Try submitting the biggest documents in a second link from your landlord, or attach smaller versions.`
+      );
+      return;
+    }
+
     setIsSubmitting(true);
 
     const form = new FormData();
@@ -36,15 +64,22 @@ export function IntakeForm({ token }: { token: string }) {
         },
         body: form,
       });
-      const body = (await res.json()) as { ok?: boolean; error?: string };
+      let body: { ok?: boolean; error?: string } = {};
+      try {
+        body = (await res.json()) as { ok?: boolean; error?: string };
+      } catch {
+        // non-JSON gateway error body
+      }
       if (!res.ok || !body.ok) {
-        setError(body.error ?? "Something went wrong — please try again.");
+        setError(body.error ?? `Something went wrong (status ${res.status}) — please try again.`);
         setIsSubmitting(false);
         return;
       }
       setDone(true);
     } catch {
-      setError("Network error — please check your connection and try again.");
+      setError(
+        "Could not reach the server. This usually means the connection dropped mid-upload or the files are too large — please check your connection, try smaller files, and submit again."
+      );
       setIsSubmitting(false);
     }
   }
