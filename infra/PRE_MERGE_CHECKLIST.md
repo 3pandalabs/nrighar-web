@@ -21,8 +21,8 @@
 
 ## 3. Install Coolify + deploy resources
 
-- [ ] SSH into the Hetzner server (`ssh root@<public-ip>`), run the Coolify installer
-- [ ] Open `http://<public-ip>:8000` immediately, create the admin account
+- [x] SSH into the Hetzner server (`ssh root@5.223.94.207`), ran the Coolify installer (v4.1.2) — DONE 2026-07-20
+- [ ] Open `http://5.223.94.207:8000` immediately, create the admin account (must be done by Anil/Prachi directly — not something to delegate)
 - [ ] Add the **Postgres 17** database resource, copy its generated password / internal connection string
 - [ ] Configure scheduled Postgres backups pointing at the `nrighar-backups` R2 bucket, confirm a manual "Backup now" actually lands an object
 - [ ] Add the **`nrighar-api`** application resource (build context `api/`, Dockerfile `api/Dockerfile`), set env vars: `DATABASE_URL`, `JWT_SECRET` (fresh, `openssl rand -base64 48` — never reuse anything Supabase-related), `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET=nrighar-documents`, `R2_ENDPOINT`, `PORT`
