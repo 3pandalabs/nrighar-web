@@ -47,6 +47,8 @@ Same project → **New Resource → Application** → **Public Repository** (or 
 
 **Domains:** set `api.nrighar.3pandalabs.com`. Coolify's Traefik will request a Let's Encrypt certificate automatically the first time it's deployed — this requires the DNS A record (see `infra/README.md` step 6) to already resolve to this box, or the ACME HTTP-01 challenge fails. Do DNS first, then deploy.
 
+**Ports Exposes (General page):** Coolify defaults new resources to `3000` — change this to **`8080`** to match the Dockerfile's `EXPOSE 8080` / the `PORT` env var below. Mismatched here causes "bad gateway"/no-server errors even though the build succeeds (hit this 2026-07-20).
+
 **Environment Variables** (Coolify's per-resource env var UI, marked secret where noted):
 
 | Key | Value | Secret? |
