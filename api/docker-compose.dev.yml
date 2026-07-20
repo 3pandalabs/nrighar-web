@@ -1,0 +1,18 @@
+# Local dev only: a throwaway Postgres to develop/test the api/ service against.
+# Production Postgres is a separate Coolify-managed resource (see infra/README.md) —
+# this file is never used in prod.
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nrighar
+      POSTGRES_PASSWORD: nrighar
+      POSTGRES_DB: nrighar
+    ports:
+      - "5432:5432"
+    volumes:
+      - nrighar-dev-pgdata:/var/lib/postgresql/data
+
+volumes:
+  nrighar-dev-pgdata:

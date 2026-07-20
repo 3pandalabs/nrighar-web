@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { apiFetch, ApiError } from "@/lib/api/client";
 import type { Tenant, TenantDocument, TenantProfile } from "@/lib/types";
+import { getDownloadUrl } from "../../actions";
 
-const DOC_TYPE_LABELS: Record<TenantDocument["doc_type"], string> = {
+const DOC_TYPE_LABELS: Record<TenantDocument["docType"], string> = {
   agreement: "Rent agreement",
   kyc: "ID / KYC",
   property_paper: "Property papers",
@@ -17,43 +18,29 @@ export default async function TenantDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createClient();
 
-  const { data: tenant } = await supabase
-    .from("tenants")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle<Tenant>();
-
-  if (!tenant) {
-    notFound();
+  let tenant: Tenant;
+  try {
+    tenant = await apiFetch(`/tenants/${id}`);
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) notFound();
+    throw e;
   }
 
   // Shared profile data is only readable while the tenant's share is active —
-  // if they revoke, these queries silently return nothing.
-  const [{ data: sharedProfile }, { data: sharedDocs }] = tenant.tenant_user_id
-    ? await Promise.all([
-        supabase
-          .from("tenant_profiles")
-          .select("*")
-          .eq("user_id", tenant.tenant_user_id)
-          .maybeSingle<TenantProfile>(),
-        supabase
-          .from("tenant_documents")
-          .select("*")
-          .eq("tenant_user_id", tenant.tenant_user_id)
-          .order("created_at", { ascending: false })
-          .returns<TenantDocument[]>(),
-      ])
-    : [{ data: null }, { data: [] as TenantDocument[] }];
+  // if they revoke, these calls 404 (see api/ROUTES.md's share-conditional
+  // reads), same "silently returns nothing" behavior as the old RLS policy.
+  let sharedProfile: TenantProfile | null = null;
+  let sharedDocs: TenantDocument[] = [];
+  if (tenant.tenantUserId) {
+    [sharedProfile, sharedDocs] = await Promise.all([
+      apiFetch(`/tenant-profiles/by-owner/${tenant.tenantUserId}`).catch(() => null),
+      apiFetch(`/tenant-documents/by-owner/${tenant.tenantUserId}`).catch(() => []),
+    ]);
+  }
 
   const docsWithUrls = await Promise.all(
-    (sharedDocs ?? []).map(async (doc) => {
-      const { data } = await supabase.storage
-        .from("documents")
-        .createSignedUrl(doc.storage_path, 60 * 10);
-      return { doc, signedUrl: data?.signedUrl ?? null };
-    })
+    (sharedDocs ?? []).map(async (doc) => ({ doc, signedUrl: await getDownloadUrl(doc.storagePath) }))
   );
 
   return (
@@ -67,9 +54,9 @@ export default async function TenantDetailPage({
         </Link>
         <div className="mt-2 flex items-center gap-3">
           <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-50">
-            {tenant.full_name}
+            {tenant.fullName}
           </h1>
-          {(sharedProfile?.kyc_status ?? tenant.kyc_status) === "verified" && (
+          {(sharedProfile?.kycStatus ?? tenant.kycStatus) === "verified" && (
             <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
               Verified ✓
             </span>
@@ -80,7 +67,7 @@ export default async function TenantDetailPage({
         </p>
       </div>
 
-      {tenant.tenant_user_id ? (
+      {tenant.tenantUserId ? (
         sharedProfile ? (
           <>
             <section className="rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
@@ -88,12 +75,12 @@ export default async function TenantDetailPage({
                 Shared renter profile
               </h2>
               <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-                <ProfileField label="Full name" value={sharedProfile.full_name} />
+                <ProfileField label="Full name" value={sharedProfile.fullName} />
                 <ProfileField label="Phone" value={sharedProfile.phone} />
                 <ProfileField label="Email" value={sharedProfile.email} />
-                <ProfileField label="Current city" value={sharedProfile.current_city} />
+                <ProfileField label="Current city" value={sharedProfile.currentCity} />
                 <ProfileField label="Employer" value={sharedProfile.employer} />
-                <ProfileField label="KYC status" value={sharedProfile.kyc_status} />
+                <ProfileField label="KYC status" value={sharedProfile.kycStatus} />
               </dl>
             </section>
 
@@ -113,7 +100,7 @@ export default async function TenantDetailPage({
                           {doc.title}
                         </span>
                         <span className="text-xs text-zinc-500">
-                          {DOC_TYPE_LABELS[doc.doc_type]}
+                          {DOC_TYPE_LABELS[doc.docType]}
                         </span>
                       </span>
                       {signedUrl && (

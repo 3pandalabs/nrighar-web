@@ -1,13 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { apiGetCurrentUser } from "@/lib/api/client";
 import { tenantSignOut } from "./actions";
 
 export default async function TenantLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await apiGetCurrentUser();
 
   if (!user) {
     redirect("/login");

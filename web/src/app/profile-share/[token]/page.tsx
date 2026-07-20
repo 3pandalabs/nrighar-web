@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { apiFetch, apiGetCurrentUser } from "@/lib/api/client";
 import { ClaimButton } from "./claim-button";
 
 type SharePreview = {
   status: "open" | "claimed" | "revoked";
-  full_name: string;
-  current_city: string | null;
-  kyc_status: string;
+  fullName: string;
+  currentCity: string | null;
+  kycStatus: string;
 };
 
 export default async function ProfileSharePage({
@@ -15,15 +15,11 @@ export default async function ProfileSharePage({
   params: Promise<{ token: string }>;
 }) {
   const { token } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await apiGetCurrentUser();
 
   let preview: SharePreview | null = null;
   if (user && /^[0-9a-f-]{36}$/i.test(token)) {
-    const { data } = await supabase.rpc("get_profile_share_preview", { p_token: token });
-    preview = (data as SharePreview | null) ?? null;
+    preview = (await apiFetch(`/profile-shares/${token}/preview`).catch(() => null)) as SharePreview | null;
   }
 
   return (
@@ -56,12 +52,12 @@ export default async function ProfileSharePage({
             <div className="text-center">
               <p className="text-sm text-zinc-500">Shared renter profile</p>
               <p className="mt-1 text-xl font-semibold text-zinc-900 dark:text-zinc-50">
-                {preview.full_name || "Unnamed tenant"}
+                {preview.fullName || "Unnamed tenant"}
               </p>
-              {preview.current_city && (
-                <p className="text-sm text-zinc-500">{preview.current_city}</p>
+              {preview.currentCity && (
+                <p className="text-sm text-zinc-500">{preview.currentCity}</p>
               )}
-              {preview.kyc_status === "verified" && (
+              {preview.kycStatus === "verified" && (
                 <p className="mt-1 text-sm font-medium text-emerald-600 dark:text-emerald-500">
                   Verified ✓
                 </p>

@@ -1,30 +1,24 @@
-import { createClient } from "@/lib/supabase/server";
+import { publicGet } from "@/lib/api/public";
 import { monthLabel } from "@/lib/upi";
 import { PayActions } from "./pay-actions";
 
 type PayLinkData = {
-  amount_due: number;
-  period_year: number;
-  period_month: number;
-  property_nickname: string;
-  property_city: string;
-  tenant_name: string;
-  owner_upi_vpa: string | null;
-  owner_upi_name: string | null;
-  claimed_paid_at: string | null;
+  amountDue: number;
+  periodYear: number;
+  periodMonth: number;
+  propertyNickname: string;
+  propertyCity: string;
+  tenantName: string;
+  ownerUpiVpa: string | null;
+  ownerUpiName: string | null;
+  claimedPaidAt: string | null;
 };
 
 export default async function PayPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
 
   const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  let data: PayLinkData | null = null;
-
-  if (uuidPattern.test(token)) {
-    const supabase = await createClient();
-    const { data: result } = await supabase.rpc("get_pay_link", { p_token: token });
-    data = (result as PayLinkData | null) ?? null;
-  }
+  const data = uuidPattern.test(token) ? await publicGet<PayLinkData>(`/pay-links/${token}`) : null;
 
   if (!data) {
     return (
@@ -41,29 +35,29 @@ export default async function PayPage({ params }: { params: Promise<{ token: str
     style: "currency",
     currency: "INR",
     maximumFractionDigits: 0,
-  }).format(Number(data.amount_due));
+  }).format(Number(data.amountDue));
 
   return (
     <Shell>
       <div className="flex flex-col gap-6">
         <div className="text-center">
           <p className="text-sm text-zinc-500">
-            Rent for {data.property_nickname}, {data.property_city}
+            Rent for {data.propertyNickname}, {data.propertyCity}
           </p>
           <p className="mt-1 text-4xl font-semibold text-zinc-900 dark:text-zinc-50">{rupees}</p>
           <p className="mt-1 text-sm text-zinc-500">
-            {monthLabel(data.period_year, data.period_month)}
+            {monthLabel(data.periodYear, data.periodMonth)}
           </p>
         </div>
 
-        {data.owner_upi_vpa ? (
+        {data.ownerUpiVpa ? (
           <PayActions
             token={token}
-            vpa={data.owner_upi_vpa}
-            payeeName={data.owner_upi_name ?? "Landlord"}
-            amount={Number(data.amount_due)}
-            note={`Rent ${data.property_nickname} ${monthLabel(data.period_year, data.period_month)}`}
-            alreadyClaimed={data.claimed_paid_at != null}
+            vpa={data.ownerUpiVpa}
+            payeeName={data.ownerUpiName ?? "Landlord"}
+            amount={Number(data.amountDue)}
+            note={`Rent ${data.propertyNickname} ${monthLabel(data.periodYear, data.periodMonth)}`}
+            alreadyClaimed={data.claimedPaidAt != null}
           />
         ) : (
           <p className="text-center text-sm text-zinc-500">

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { apiFetch, apiGetCurrentUser } from "@/lib/api/client";
 import { SUPPORTED_CURRENCIES } from "@/lib/currency";
 import type { Profile } from "@/lib/types";
 import { saveProfile } from "../actions";
@@ -10,20 +10,12 @@ export default async function SettingsPage({
   searchParams: Promise<{ saved?: string }>;
 }) {
   const { saved } = await searchParams;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const user = await apiGetCurrentUser();
   if (!user) {
     redirect("/login");
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .maybeSingle<Profile>();
+  const profile = (await apiFetch("/profile").catch(() => null)) as Profile | null;
 
   return (
     <div className="flex max-w-xl flex-col gap-8">
@@ -44,7 +36,7 @@ export default async function SettingsPage({
           Display name
           <input
             name="display_name"
-            defaultValue={profile?.display_name ?? ""}
+            defaultValue={profile?.displayName ?? ""}
             className="rounded-lg border border-zinc-300 px-3 py-2 text-sm font-normal dark:border-zinc-700 dark:bg-zinc-900"
           />
         </label>
@@ -52,7 +44,7 @@ export default async function SettingsPage({
           Country of residence
           <input
             name="country_of_residence"
-            defaultValue={profile?.country_of_residence ?? ""}
+            defaultValue={profile?.countryOfResidence ?? ""}
             placeholder="e.g. United States"
             className="rounded-lg border border-zinc-300 px-3 py-2 text-sm font-normal dark:border-zinc-700 dark:bg-zinc-900"
           />
@@ -61,7 +53,7 @@ export default async function SettingsPage({
           UPI ID (for tenant pay links — usually your NRO account&apos;s UPI)
           <input
             name="upi_vpa"
-            defaultValue={profile?.upi_vpa ?? ""}
+            defaultValue={profile?.upiVpa ?? ""}
             placeholder="e.g. name@oksbi"
             className="rounded-lg border border-zinc-300 px-3 py-2 text-sm font-normal dark:border-zinc-700 dark:bg-zinc-900"
           />
@@ -70,7 +62,7 @@ export default async function SettingsPage({
           Name on UPI (shown to tenants when paying)
           <input
             name="upi_name"
-            defaultValue={profile?.upi_name ?? ""}
+            defaultValue={profile?.upiName ?? ""}
             className="rounded-lg border border-zinc-300 px-3 py-2 text-sm font-normal dark:border-zinc-700 dark:bg-zinc-900"
           />
         </label>
@@ -78,7 +70,7 @@ export default async function SettingsPage({
           Home currency (for approximate conversions)
           <select
             name="preferred_currency"
-            defaultValue={profile?.preferred_currency ?? "USD"}
+            defaultValue={profile?.preferredCurrency ?? "USD"}
             className="rounded-lg border border-zinc-300 px-3 py-2 text-sm font-normal dark:border-zinc-700 dark:bg-zinc-900"
           >
             {SUPPORTED_CURRENCIES.map((c) => (

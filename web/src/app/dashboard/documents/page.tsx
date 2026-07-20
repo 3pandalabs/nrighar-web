@@ -1,9 +1,9 @@
-import { createClient } from "@/lib/supabase/server";
+import { apiFetch } from "@/lib/api/client";
 import type { DocumentRow, Property } from "@/lib/types";
-import { deleteDocument } from "../actions";
+import { deleteDocument, getDownloadUrl } from "../actions";
 import { UploadForm } from "./upload-form";
 
-const DOC_TYPE_LABELS: Record<DocumentRow["doc_type"], string> = {
+const DOC_TYPE_LABELS: Record<DocumentRow["docType"], string> = {
   agreement: "Rent agreement",
   kyc: "Tenant KYC",
   property_paper: "Property papers",
@@ -12,26 +12,15 @@ const DOC_TYPE_LABELS: Record<DocumentRow["doc_type"], string> = {
 };
 
 export default async function DocumentsPage() {
-  const supabase = await createClient();
-
-  const [{ data: documents }, { data: properties }] = await Promise.all([
-    supabase
-      .from("documents")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .returns<DocumentRow[]>(),
-    supabase.from("properties").select("*").order("nickname").returns<Property[]>(),
+  const [documents, properties] = await Promise.all([
+    apiFetch("/documents") as Promise<DocumentRow[]>,
+    apiFetch("/properties") as Promise<Property[]>,
   ]);
 
   const propertyById = new Map((properties ?? []).map((p) => [p.id, p]));
 
   const docsWithUrls = await Promise.all(
-    (documents ?? []).map(async (doc) => {
-      const { data } = await supabase.storage
-        .from("documents")
-        .createSignedUrl(doc.storage_path, 60 * 10);
-      return { doc, signedUrl: data?.signedUrl ?? null };
-    })
+    (documents ?? []).map(async (doc) => ({ doc, signedUrl: await getDownloadUrl(doc.storagePath) }))
   );
 
   return (
@@ -52,9 +41,9 @@ export default async function DocumentsPage() {
                   {doc.title}
                 </span>
                 <span className="text-xs text-zinc-500">
-                  {DOC_TYPE_LABELS[doc.doc_type]}
-                  {doc.property_id && propertyById.get(doc.property_id)
-                    ? ` · ${propertyById.get(doc.property_id)!.nickname}`
+                  {DOC_TYPE_LABELS[doc.docType]}
+                  {doc.propertyId && propertyById.get(doc.propertyId)
+                    ? ` · ${propertyById.get(doc.propertyId)!.nickname}`
                     : ""}
                 </span>
               </span>
@@ -71,7 +60,6 @@ export default async function DocumentsPage() {
                 )}
                 <form action={deleteDocument}>
                   <input type="hidden" name="id" value={doc.id} />
-                  <input type="hidden" name="storage_path" value={doc.storage_path} />
                   <button type="submit" className="text-red-600 hover:underline">
                     Delete
                   </button>

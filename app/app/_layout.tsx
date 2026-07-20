@@ -5,7 +5,7 @@ import { ActivityIndicator, View } from "react-native";
 import { AuthProvider, useAuth } from "../hooks/useAuth";
 
 function RootNavigation() {
-  const { session, role, isLoading } = useAuth();
+  const { user, role, isLoading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
@@ -15,14 +15,14 @@ function RootNavigation() {
     const inAuthGroup = segments[0] === "(auth)";
     const onTenantNotice = segments[0] === "tenant-notice";
 
-    if (!session && !inAuthGroup) {
+    if (!user && !inAuthGroup) {
       router.replace("/(auth)/sign-in");
-    } else if (session && role === "tenant" && !onTenantNotice) {
+    } else if (user && role === "tenant" && !onTenantNotice) {
       router.replace("/tenant-notice");
-    } else if (session && role !== "tenant" && (inAuthGroup || onTenantNotice)) {
+    } else if (user && role !== "tenant" && (inAuthGroup || onTenantNotice)) {
       router.replace("/(tabs)");
     }
-  }, [session, role, isLoading, segments, router]);
+  }, [user, role, isLoading, segments, router]);
 
   if (isLoading) {
     return (

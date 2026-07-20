@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { apiFetch } from "@/lib/api/client";
 import type { Lease, Property, Tenant } from "@/lib/types";
 import { addProperty } from "../actions";
 
@@ -12,16 +12,15 @@ const PROPERTY_TYPES = [
 ] as const;
 
 export default async function PropertiesPage() {
-  const supabase = await createClient();
-
-  const [{ data: properties }, { data: leases }, { data: tenants }] = await Promise.all([
-    supabase.from("properties").select("*").order("created_at").returns<Property[]>(),
-    supabase.from("leases").select("*").eq("status", "active").returns<Lease[]>(),
-    supabase.from("tenants").select("*").returns<Tenant[]>(),
+  const [properties, allLeases, tenants] = await Promise.all([
+    apiFetch("/properties") as Promise<Property[]>,
+    apiFetch("/leases") as Promise<Lease[]>,
+    apiFetch("/tenants") as Promise<Tenant[]>,
   ]);
 
+  const leases = (allLeases ?? []).filter((l) => l.status === "active");
   const tenantById = new Map((tenants ?? []).map((t) => [t.id, t]));
-  const activeLeaseByProperty = new Map((leases ?? []).map((l) => [l.property_id, l]));
+  const activeLeaseByProperty = new Map(leases.map((l) => [l.propertyId, l]));
 
   return (
     <div className="flex flex-col gap-8">
@@ -31,7 +30,7 @@ export default async function PropertiesPage() {
         <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {properties.map((property) => {
             const lease = activeLeaseByProperty.get(property.id);
-            const tenant = lease ? tenantById.get(lease.tenant_id) : undefined;
+            const tenant = lease ? tenantById.get(lease.tenantId) : undefined;
             return (
               <li key={property.id}>
                 <Link
@@ -43,16 +42,16 @@ export default async function PropertiesPage() {
                       {property.nickname}
                     </h2>
                     <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs capitalize text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400">
-                      {property.property_type.replace("_", " ")}
+                      {property.propertyType.replace("_", " ")}
                     </span>
                   </div>
                   <p className="mt-1 text-sm text-zinc-500">
-                    {property.address_line1}, {property.city}, {property.state} {property.pincode}
+                    {property.addressLine1}, {property.city}, {property.state} {property.pincode}
                   </p>
                   <p className="mt-3 text-sm">
                     {lease ? (
                       <span className="text-emerald-600 dark:text-emerald-500">
-                        Rented to {tenant?.full_name ?? "tenant"}
+                        Rented to {tenant?.fullName ?? "tenant"}
                       </span>
                     ) : (
                       <span className="text-zinc-500">Vacant</span>

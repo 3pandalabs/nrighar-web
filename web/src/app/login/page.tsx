@@ -4,7 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { GradientBackdrop } from "@/components/GradientBackdrop";
-import { createClient } from "@/lib/supabase/client";
+import { signIn, signUp } from "./actions";
+
+const ERROR_MESSAGES: Record<string, string> = {
+  invalid_credentials: "Incorrect email or password.",
+  conflict: "An account with that email already exists.",
+};
 
 export default function LoginPage() {
   const router = useRouter();
@@ -20,42 +25,15 @@ export default function LoginPage() {
     setError(null);
     setIsSubmitting(true);
 
-    const supabase = createClient();
+    const result = mode === "sign-up" ? await signUp(email, password, role) : await signIn(email, password);
 
-    if (mode === "sign-up") {
-      const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) {
-        setError(error.message);
-        setIsSubmitting(false);
-        return;
-      }
-      if (data.user) {
-        await supabase.from("profiles").upsert({ id: data.user.id, role });
-        if (role === "tenant") {
-          await supabase.from("tenant_profiles").upsert({ user_id: data.user.id, full_name: "", email });
-        }
-      }
-      router.push(role === "tenant" ? "/tenant" : "/dashboard");
-      router.refresh();
-      return;
-    }
-
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      setError(error.message);
+    if (!result.ok) {
+      setError(ERROR_MESSAGES[result.error] ?? "Something went wrong.");
       setIsSubmitting(false);
       return;
     }
 
-    // Route by the account's actual role, not the toggle — the toggle is a
-    // hint for sign-up; existing accounts go where they belong.
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", data.user.id)
-      .maybeSingle();
-
-    router.push(profile?.role === "tenant" ? "/tenant" : "/dashboard");
+    router.push(result.role === "tenant" ? "/tenant" : "/dashboard");
     router.refresh();
   }
 

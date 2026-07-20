@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { apiFetch, ApiError } from "@/lib/api/client";
 import { formatInr } from "@/lib/currency";
 import type { Lease, Property, RentPayment, Tenant } from "@/lib/types";
 import { addLease, endLease } from "../../actions";
@@ -11,43 +11,39 @@ export default async function PropertyDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createClient();
 
-  const [{ data: property }, { data: tenants }, { data: leases }] = await Promise.all([
-    supabase.from("properties").select("*").eq("id", id).maybeSingle<Property>(),
-    supabase.from("tenants").select("*").order("full_name").returns<Tenant[]>(),
-    supabase
-      .from("leases")
-      .select("*")
-      .eq("property_id", id)
-      .order("created_at", { ascending: false })
-      .returns<Lease[]>(),
-  ]);
-
-  if (!property) {
-    notFound();
+  let property: Property;
+  try {
+    property = await apiFetch(`/properties/${id}`);
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) notFound();
+    throw e;
   }
 
-  const activeLease = (leases ?? []).find((l) => l.status === "active");
-  const pastLeases = (leases ?? []).filter((l) => l.status === "ended");
+  const [tenants, allLeases, allPayments] = await Promise.all([
+    apiFetch("/tenants") as Promise<Tenant[]>,
+    apiFetch("/leases") as Promise<Lease[]>,
+    apiFetch("/rent-payments") as Promise<RentPayment[]>,
+  ]);
+
+  const leases = (allLeases ?? [])
+    .filter((l) => l.propertyId === id)
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+
+  const activeLease = leases.find((l) => l.status === "active");
+  const pastLeases = leases.filter((l) => l.status === "ended");
   const tenantById = new Map((tenants ?? []).map((t) => [t.id, t]));
 
-  const leaseIds = (leases ?? []).map((l) => l.id);
-  const { data: allPayments } = leaseIds.length
-    ? await supabase
-        .from("rent_payments")
-        .select("*")
-        .in("lease_id", leaseIds)
-        .order("period_year", { ascending: false })
-        .order("period_month", { ascending: false })
-        .returns<RentPayment[]>()
-    : { data: [] as RentPayment[] };
+  const leaseIds = new Set(leases.map((l) => l.id));
+  const allPaymentsForProperty = (allPayments ?? [])
+    .filter((p) => leaseIds.has(p.leaseId))
+    .sort((a, b) => b.periodYear - a.periodYear || b.periodMonth - a.periodMonth);
 
   const paymentsByLease = new Map<string, RentPayment[]>();
-  for (const p of allPayments ?? []) {
-    const list = paymentsByLease.get(p.lease_id) ?? [];
+  for (const p of allPaymentsForProperty) {
+    const list = paymentsByLease.get(p.leaseId) ?? [];
     list.push(p);
-    paymentsByLease.set(p.lease_id, list);
+    paymentsByLease.set(p.leaseId, list);
   }
   const payments = activeLease ? (paymentsByLease.get(activeLease.id) ?? []).slice(0, 12) : [];
 
@@ -61,8 +57,8 @@ export default async function PropertyDetailPage({
           {property.nickname}
         </h1>
         <p className="text-sm text-zinc-500">
-          {property.address_line1}
-          {property.address_line2 ? `, ${property.address_line2}` : ""}, {property.city},{" "}
+          {property.addressLine1}
+          {property.addressLine2 ? `, ${property.addressLine2}` : ""}, {property.city},{" "}
           {property.state} {property.pincode}
         </p>
         {property.notes && <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{property.notes}</p>}
@@ -74,19 +70,19 @@ export default async function PropertyDetailPage({
           <div className="flex flex-col gap-2 text-sm">
             <p>
               <span className="text-zinc-500">Tenant:</span>{" "}
-              {tenantById.get(activeLease.tenant_id)?.full_name ?? "Unknown"}
+              {tenantById.get(activeLease.tenantId)?.fullName ?? "Unknown"}
             </p>
             <p>
-              <span className="text-zinc-500">Rent:</span> {formatInr(Number(activeLease.rent_amount))} / month,
-              due on day {activeLease.rent_due_day}
+              <span className="text-zinc-500">Rent:</span> {formatInr(Number(activeLease.rentAmount))} / month,
+              due on day {activeLease.rentDueDay}
             </p>
-            {activeLease.deposit_amount != null && (
+            {activeLease.depositAmount != null && (
               <p>
-                <span className="text-zinc-500">Deposit:</span> {formatInr(Number(activeLease.deposit_amount))}
+                <span className="text-zinc-500">Deposit:</span> {formatInr(Number(activeLease.depositAmount))}
               </p>
             )}
             <p>
-              <span className="text-zinc-500">Since:</span> {activeLease.start_date}
+              <span className="text-zinc-500">Since:</span> {activeLease.startDate}
             </p>
             <form action={endLease} className="mt-3">
               <input type="hidden" name="lease_id" value={activeLease.id} />
@@ -124,7 +120,7 @@ export default async function PropertyDetailPage({
                   >
                     {(tenants ?? []).map((t) => (
                       <option key={t.id} value={t.id}>
-                        {t.full_name}
+                        {t.fullName}
                       </option>
                     ))}
                   </select>
@@ -156,7 +152,7 @@ export default async function PropertyDetailPage({
           <ul className="flex flex-col gap-3">
             {pastLeases.map((pl) => {
               const plPayments = paymentsByLease.get(pl.id) ?? [];
-              const collected = plPayments.reduce((sum, p) => sum + Number(p.amount_paid ?? 0), 0);
+              const collected = plPayments.reduce((sum, p) => sum + Number(p.amountPaid ?? 0), 0);
               return (
                 <li
                   key={pl.id}
@@ -165,10 +161,10 @@ export default async function PropertyDetailPage({
                   <details>
                     <summary className="cursor-pointer text-sm">
                       <span className="font-medium text-zinc-900 dark:text-zinc-50">
-                        {tenantById.get(pl.tenant_id)?.full_name ?? "Unknown tenant"}
+                        {tenantById.get(pl.tenantId)?.fullName ?? "Unknown tenant"}
                       </span>{" "}
                       <span className="text-zinc-500">
-                        · {pl.start_date} → {pl.end_date ?? "?"} · {formatInr(Number(pl.rent_amount))}
+                        · {pl.startDate} → {pl.endDate ?? "?"} · {formatInr(Number(pl.rentAmount))}
                         /month · {plPayments.length} payment{plPayments.length === 1 ? "" : "s"}{" "}
                         recorded ({formatInr(collected)} collected)
                       </span>
@@ -181,13 +177,13 @@ export default async function PropertyDetailPage({
                             className="flex items-center justify-between py-2 text-sm"
                           >
                             <span>
-                              {new Date(p.period_year, p.period_month - 1).toLocaleString("en-US", {
+                              {new Date(p.periodYear, p.periodMonth - 1).toLocaleString("en-US", {
                                 month: "long",
                                 year: "numeric",
                               })}
                             </span>
                             <span className="flex items-center gap-3">
-                              <span>{formatInr(Number(p.amount_paid ?? 0))}</span>
+                              <span>{formatInr(Number(p.amountPaid ?? 0))}</span>
                               <span
                                 className={
                                   p.status === "paid"
@@ -224,13 +220,13 @@ export default async function PropertyDetailPage({
               {payments.map((p) => (
                 <li key={p.id} className="flex items-center justify-between px-4 py-3 text-sm">
                   <span>
-                    {new Date(p.period_year, p.period_month - 1).toLocaleString("en-US", {
+                    {new Date(p.periodYear, p.periodMonth - 1).toLocaleString("en-US", {
                       month: "long",
                       year: "numeric",
                     })}
                   </span>
                   <span className="flex items-center gap-3">
-                    <span>{formatInr(Number(p.amount_paid ?? 0))}</span>
+                    <span>{formatInr(Number(p.amountPaid ?? 0))}</span>
                     <span
                       className={
                         p.status === "paid" ? "text-emerald-600 dark:text-emerald-500" : "text-amber-600"
