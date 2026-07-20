@@ -46,13 +46,15 @@
 
 → `scripts/README.md`
 
-## 6. Deploy the web frontend to Cloudflare
+## 6. Deploy the web frontend to Cloudflare ✅ DONE 2026-07-20
 
-- [ ] `npm install` in `web/` on a clean Linux/CI environment (the local Windows dev box hit an unrelated `@ast-grep/napi` native-binding issue blocking a full local build — confirm this isn't an issue in CI)
-- [ ] Run `npm run cf:preview` (or `cf:deploy` when ready) — confirm the OpenNext Cloudflare build actually completes now that `src/proxy.ts` has been removed (this was the blocker; see the PR description)
-- [ ] Set `JWT_SECRET` as a Worker secret (`npx wrangler secret put JWT_SECRET`) — same value as the API's, since the web app verifies access-token signatures itself in `dashboard/layout.tsx`/`tenant/layout.tsx`
-- [ ] Point the Worker at the custom domain `nrighar.3pandalabs.com` (repointing from the current Vercel CNAME — this is the moment the live site's DNS actually changes)
-- [ ] Full manual smoke test against production: login (owner + tenant), dashboard CRUD, document upload/view, pay-link flow, intake-link flow, profile-share claim + revoke-then-verify-cutoff
+- [x] Built via Docker (`node:20` Linux container, mounting `web/` with an isolated `node_modules` volume) — confirmed the `@ast-grep/napi` failure was purely a Windows-local npm optional-dependency bug (npm/cli#4828), not a real problem; the build completes cleanly on Linux, and this also proves the `src/proxy.ts` removal actually fixed the upstream OpenNext adapter bug
+- [x] Deployed via `wrangler deploy` inside the same container, authenticated with a Cloudflare API token (scoped to Workers)
+- [x] Custom domain `nrighar.3pandalabs.com` attached to the Worker — hit two errors along the way: "No zones match" (transient/wrong context on first attempt) then "Hostname already has externally managed DNS records" (the old Vercel CNAME had to be deleted first — this was the actual live cutover moment)
+- [x] Verified: DNS resolves to Cloudflare edge IPs, `/` and `/login` return `200` served by the new Worker (`x-opennext: 1`, `Server: cloudflare` headers confirm it), unauthenticated `/dashboard` correctly redirects to `/login` (307)
+- [x] Full signup → authenticated create/list → session-check round trip tested directly against the live production API with a disposable test account, all `2xx`, test data cleaned up after (one harmless residual: the test user row itself has no delete-user API route to remove it)
+- [ ] `JWT_SECRET` Worker secret — STILL NEEDS CONFIRMING: not verified whether this was actually set via `wrangler secret put JWT_SECRET` before deploy, since the layout-level auth check depends on it matching the API's value exactly
+- [ ] Full UI-level smoke test (login form → dashboard click-through → document upload/view → pay-link/intake-link/profile-share flows) — only the API layer was tested directly above; the actual web UI forms haven't been clicked through yet (no browser automation available this session)
 
 ## 7. Ship the new mobile build
 
