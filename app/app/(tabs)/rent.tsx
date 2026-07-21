@@ -3,7 +3,7 @@ import { useFocusEffect } from "expo-router";
 import { Alert, FlatList, Linking, Pressable, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { ScreenBackground } from "../../components/ScreenBackground";
 import { useAuth } from "../../hooks/useAuth";
-import { supabase } from "../../lib/supabase";
+import { api, ApiError } from "../../lib/api";
 import { SITE_URL } from "../../lib/constants";
 import {
   formatInr,
@@ -15,7 +15,7 @@ import {
 } from "../../lib/types";
 
 export default function RentScreen() {
-  const { session } = useAuth();
+  const { user } = useAuth();
   const [leases, setLeases] = useState<Lease[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -31,32 +31,25 @@ export default function RentScreen() {
   const monthLabel = now.toLocaleString("en-US", { month: "long", year: "numeric" });
 
   const load = useCallback(async () => {
-    const [
-      { data: leaseRows },
-      { data: props },
-      { data: tenantRows },
-      { data: paymentRows },
-      { data: payLinkRows },
-      { data: profile },
-    ] = await Promise.all([
-      supabase.from("leases").select("*").eq("status", "active"),
-      supabase.from("properties").select("*"),
-      supabase.from("tenants").select("*"),
-      supabase.from("rent_payments").select("*").eq("period_year", year).eq("period_month", month),
-      supabase.from("pay_links").select("*").eq("period_year", year).eq("period_month", month),
-      session
-        ? supabase.from("profiles").select("upi_vpa").eq("id", session.user.id).maybeSingle()
-        : Promise.resolve({ data: null }),
+    const [leaseRows, props, tenantRows, paymentRows, payLinkRows, profile] = await Promise.all([
+      api.get<Lease[]>("/leases"),
+      api.get<Property[]>("/properties"),
+      api.get<Tenant[]>("/tenants"),
+      api.get<RentPayment[]>("/rent-payments"),
+      api.get<PayLink[]>("/pay-links"),
+      user
+        ? api.get<{ upiVpa: string | null }>("/profile")
+        : Promise.resolve({ upiVpa: null }),
     ]);
 
-    setLeases((leaseRows ?? []) as Lease[]);
-    setProperties((props ?? []) as Property[]);
-    setTenants((tenantRows ?? []) as Tenant[]);
-    setPayments((paymentRows ?? []) as RentPayment[]);
-    setPayLinks((payLinkRows ?? []) as PayLink[]);
-    setUpiVpa((profile as { upi_vpa?: string | null } | null)?.upi_vpa ?? null);
+    setLeases(leaseRows.filter((l) => l.status === "active"));
+    setProperties(props);
+    setTenants(tenantRows);
+    setPayments(paymentRows.filter((p) => p.periodYear === year && p.periodMonth === month));
+    setPayLinks(payLinkRows.filter((p) => p.periodYear === year && p.periodMonth === month));
+    setUpiVpa(profile.upiVpa ?? null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
+  }, [user]);
 
   useFocusEffect(
     useCallback(() => {
@@ -71,37 +64,32 @@ export default function RentScreen() {
   }
 
   async function sendPayLink(lease: Lease, tenant: Tenant, property: Property | undefined) {
-    if (!session || !tenant.phone) return;
+    if (!user || !tenant.phone) return;
     setSendingLease(lease.id);
     try {
       let payLinkUrl: string | null = null;
       if (upiVpa) {
-        const { data, error } = await supabase
-          .from("pay_links")
-          .upsert(
-            {
-              owner_id: session.user.id,
-              lease_id: lease.id,
-              period_year: year,
-              period_month: month,
-              amount_due: Number(lease.rent_amount),
-            },
-            { onConflict: "lease_id,period_year,period_month" }
-          )
-          .select("id")
-          .single();
-        if (error) {
-          Alert.alert("Could not create pay link", error.message);
+        try {
+          const payLink = await api.post<PayLink>(`/leases/${lease.id}/pay-links`, {
+            periodYear: year,
+            periodMonth: month,
+            amountDue: Number(lease.rentAmount),
+          });
+          payLinkUrl = `${SITE_URL}/pay/${payLink.id}`;
+        } catch (err) {
+          Alert.alert(
+            "Could not create pay link",
+            err instanceof ApiError ? err.code.replace(/_/g, " ") : "Something went wrong."
+          );
           return;
         }
-        payLinkUrl = `${SITE_URL}/pay/${data.id}`;
       }
 
-      const rupees = formatInr(Number(lease.rent_amount));
+      const rupees = formatInr(Number(lease.rentAmount));
       const propertyName = property?.nickname ?? "the property";
       const message = payLinkUrl
-        ? `Hi ${tenant.full_name}, hope you're doing well! A gentle reminder that the rent of ${rupees} for ${propertyName} for ${monthLabel} is due. You can pay via UPI here: ${payLinkUrl} — it opens your UPI app with my details filled in. Thank you!`
-        : `Hi ${tenant.full_name}, hope you're doing well! A gentle reminder that the rent of ${rupees} for ${propertyName} for ${monthLabel} is due. Please let me know once it's transferred. Thank you!`;
+        ? `Hi ${tenant.fullName}, hope you're doing well! A gentle reminder that the rent of ${rupees} for ${propertyName} for ${monthLabel} is due. You can pay via UPI here: ${payLinkUrl} — it opens your UPI app with my details filled in. Thank you!`
+        : `Hi ${tenant.fullName}, hope you're doing well! A gentle reminder that the rent of ${rupees} for ${propertyName} for ${monthLabel} is due. Please let me know once it's transferred. Thank you!`;
 
       const digits = tenant.phone.replace(/\D/g, "");
       const withCountry = digits.length === 10 ? `91${digits}` : digits;
@@ -114,8 +102,8 @@ export default function RentScreen() {
 
   const propertyById = new Map(properties.map((p) => [p.id, p]));
   const tenantById = new Map(tenants.map((t) => [t.id, t]));
-  const paymentByLease = new Map(payments.map((p) => [p.lease_id, p]));
-  const payLinkByLease = new Map(payLinks.map((p) => [p.lease_id, p]));
+  const paymentByLease = new Map(payments.map((p) => [p.leaseId, p]));
+  const payLinkByLease = new Map(payLinks.map((p) => [p.leaseId, p]));
 
   return (
     <ScreenBackground>
@@ -139,19 +127,19 @@ export default function RentScreen() {
         <Text style={styles.empty}>No active leases — set them up on the web dashboard.</Text>
       }
       renderItem={({ item }) => {
-        const property = propertyById.get(item.property_id);
-        const tenant = tenantById.get(item.tenant_id);
+        const property = propertyById.get(item.propertyId);
+        const tenant = tenantById.get(item.tenantId);
         const payment = paymentByLease.get(item.id);
         const payLink = payLinkByLease.get(item.id);
-        const overdue = !payment && now.getDate() > item.rent_due_day;
+        const overdue = !payment && now.getDate() > item.rentDueDay;
         const statusLabel =
           payment?.status === "paid"
             ? "Paid"
             : payment?.status === "partial"
-              ? `Partial: ${formatInr(Number(payment.amount_paid ?? 0))}`
+              ? `Partial: ${formatInr(Number(payment.amountPaid ?? 0))}`
               : overdue
                 ? "Overdue"
-                : `Due (day ${item.rent_due_day})`;
+                : `Due (day ${item.rentDueDay})`;
 
         return (
           <View style={styles.card}>
@@ -171,13 +159,13 @@ export default function RentScreen() {
               </Text>
             </View>
             <Text style={styles.detail}>
-              {tenant?.full_name ?? "Tenant"} · {formatInr(Number(item.rent_amount))}/month
+              {tenant?.fullName ?? "Tenant"} · {formatInr(Number(item.rentAmount))}/month
             </Text>
             {payment?.status !== "paid" && payLink && (
               <Text style={styles.payLinkStatus}>
                 Pay link sent
-                {payLink.opened_at ? " · opened ✓" : ""}
-                {payLink.claimed_paid_at ? " · tenant says paid ✓ (confirm on web)" : ""}
+                {payLink.openedAt ? " · opened ✓" : ""}
+                {payLink.claimedPaidAt ? " · tenant says paid ✓ (confirm on web)" : ""}
               </Text>
             )}
             {payment?.status !== "paid" && tenant?.phone && (

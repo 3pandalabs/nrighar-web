@@ -1,27 +1,22 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { apiFetch } from "@/lib/api/client";
 import type { IntakeLink, Property, Tenant } from "@/lib/types";
 import { addTenant, createIntakeLink, deleteIntakeLink } from "../actions";
 import { InviteLinkActions } from "./invite-link";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://nrighar.3pandalabs.com";
 
-const KYC_LABELS: Record<Tenant["kyc_status"], string> = {
+const KYC_LABELS: Record<Tenant["kycStatus"], string> = {
   pending: "KYC pending",
   submitted: "KYC submitted",
   verified: "KYC verified",
 };
 
 export default async function TenantsPage() {
-  const supabase = await createClient();
-  const [{ data: tenants }, { data: properties }, { data: intakeLinks }] = await Promise.all([
-    supabase.from("tenants").select("*").order("full_name").returns<Tenant[]>(),
-    supabase.from("properties").select("*").order("nickname").returns<Property[]>(),
-    supabase
-      .from("intake_links")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .returns<IntakeLink[]>(),
+  const [tenants, properties, intakeLinks] = await Promise.all([
+    apiFetch("/tenants") as Promise<Tenant[]>,
+    apiFetch("/properties") as Promise<Property[]>,
+    apiFetch("/intake-links") as Promise<IntakeLink[]>,
   ]);
 
   const propertyById = new Map((properties ?? []).map((p) => [p.id, p]));
@@ -40,9 +35,9 @@ export default async function TenantsPage() {
                   href={`/dashboard/tenants/${tenant.id}`}
                   className="font-medium text-zinc-900 underline-offset-2 hover:underline dark:text-zinc-50"
                 >
-                  {tenant.full_name}
+                  {tenant.fullName}
                 </Link>
-                {tenant.tenant_user_id && (
+                {tenant.tenantUserId && (
                   <span className="ml-2 rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400">
                     profile linked
                   </span>
@@ -53,12 +48,12 @@ export default async function TenantsPage() {
               </span>
               <span
                 className={
-                  tenant.kyc_status === "verified"
+                  tenant.kycStatus === "verified"
                     ? "text-emerald-600 dark:text-emerald-500"
                     : "text-amber-600"
                 }
               >
-                {KYC_LABELS[tenant.kyc_status]}
+                {KYC_LABELS[tenant.kycStatus]}
               </span>
             </li>
           ))}
@@ -101,22 +96,22 @@ export default async function TenantsPage() {
         {(intakeLinks?.length ?? 0) > 0 && (
           <ul className="mt-4 divide-y divide-zinc-200 border-t border-zinc-200 pt-1 dark:divide-zinc-800 dark:border-zinc-800">
             {(intakeLinks ?? []).map((link) => {
-              const property = link.property_id ? propertyById.get(link.property_id) : undefined;
-              const tenant = link.tenant_id ? tenantById.get(link.tenant_id) : undefined;
-              const expired = link.status === "pending" && new Date(link.expires_at) < new Date();
+              const property = link.propertyId ? propertyById.get(link.propertyId) : undefined;
+              const tenant = link.tenantId ? tenantById.get(link.tenantId) : undefined;
+              const expired = link.status === "pending" && new Date(link.expiresAt) < new Date();
               return (
                 <li key={link.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
                   <span className="text-sm">
                     {link.status === "submitted" ? (
                       <span className="text-emerald-600 dark:text-emerald-500">
-                        ✓ Submitted{tenant ? ` by ${tenant.full_name}` : ""} — review their
+                        ✓ Submitted{tenant ? ` by ${tenant.fullName}` : ""} — review their
                         documents in the vault
                       </span>
                     ) : (
                       <span className={expired ? "text-zinc-400" : "text-zinc-600 dark:text-zinc-400"}>
                         {expired ? "Expired invite" : "Pending invite"}
                         {property ? ` · ${property.nickname}` : ""} · created{" "}
-                        {new Date(link.created_at).toLocaleDateString()}
+                        {new Date(link.createdAt).toLocaleDateString()}
                       </span>
                     )}
                   </span>

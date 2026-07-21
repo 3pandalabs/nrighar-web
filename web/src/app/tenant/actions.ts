@@ -1,87 +1,92 @@
 "use server";
 
+import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { apiFetch, apiGetCurrentUser, apiLogout } from "@/lib/api/client";
 
 async function requireUser() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await apiGetCurrentUser();
   if (!user) {
     redirect("/login");
   }
-  return { supabase, user };
+  return user;
 }
 
 export async function saveTenantProfile(formData: FormData) {
-  const { supabase, user } = await requireUser();
+  const user = await requireUser();
 
-  const { error } = await supabase.from("tenant_profiles").upsert({
-    user_id: user.id,
-    full_name: String(formData.get("full_name") ?? "").trim(),
-    phone: String(formData.get("phone") ?? "").trim() || null,
-    email: String(formData.get("email") ?? "").trim() || user.email,
-    current_city: String(formData.get("current_city") ?? "").trim() || null,
-    employer: String(formData.get("employer") ?? "").trim() || null,
+  await apiFetch("/tenant-profile", {
+    method: "PATCH",
+    body: JSON.stringify({
+      fullName: String(formData.get("full_name") ?? "").trim(),
+      phone: String(formData.get("phone") ?? "").trim() || undefined,
+      email: String(formData.get("email") ?? "").trim() || user.email,
+      currentCity: String(formData.get("current_city") ?? "").trim() || undefined,
+      employer: String(formData.get("employer") ?? "").trim() || undefined,
+    }),
   });
-
-  if (error) {
-    throw new Error(`Could not save profile: ${error.message}`);
-  }
 
   redirect("/tenant?saved=1");
 }
 
 export async function createProfileShare() {
-  const { supabase, user } = await requireUser();
+  await requireUser();
 
-  const { error } = await supabase.from("profile_shares").insert({ tenant_user_id: user.id });
-  if (error) {
-    throw new Error(`Could not create share link: ${error.message}`);
-  }
+  await apiFetch("/profile-shares", { method: "POST" });
 
   revalidatePath("/tenant");
 }
 
 export async function revokeProfileShare(formData: FormData) {
-  const { supabase } = await requireUser();
+  await requireUser();
 
   const id = String(formData.get("id") ?? "");
-  const { error } = await supabase
-    .from("profile_shares")
-    .update({ status: "revoked", revoked_at: new Date().toISOString() })
-    .eq("id", id);
-
-  if (error) {
-    throw new Error(`Could not revoke: ${error.message}`);
-  }
+  await apiFetch(`/profile-shares/${id}/revoke`, { method: "POST" });
 
   revalidatePath("/tenant");
 }
 
 export async function deleteTenantDocument(formData: FormData) {
-  const { supabase } = await requireUser();
+  await requireUser();
 
   const id = String(formData.get("id") ?? "");
-  const storagePath = String(formData.get("storage_path") ?? "");
-
-  const { error: storageError } = await supabase.storage.from("documents").remove([storagePath]);
-  if (storageError) {
-    throw new Error(`Could not delete file: ${storageError.message}`);
-  }
-
-  const { error } = await supabase.from("tenant_documents").delete().eq("id", id);
-  if (error) {
-    throw new Error(`Could not delete document: ${error.message}`);
-  }
+  // NOTE: api/ROUTES.md has no storage-object-delete route yet — this removes
+  // the metadata row only; the R2 object is orphaned until that route exists.
+  await apiFetch(`/tenant-documents/${id}`, { method: "DELETE" });
 
   revalidatePath("/tenant");
 }
 
+export async function getUploadUrl(filename: string): Promise<{ key: string; url: string }> {
+  const user = await requireUser();
+  const key = `${user.id}/${randomUUID()}-${filename}`;
+  const result = await apiFetch("/storage/presign-upload", {
+    method: "POST",
+    body: JSON.stringify({ key }),
+  });
+  return { key, url: result.url };
+}
+
+export async function recordTenantDocument(input: { docType: string; title: string; storagePath: string }) {
+  await requireUser();
+  await apiFetch("/tenant-documents", { method: "POST", body: JSON.stringify(input) });
+}
+
+export async function getDownloadUrl(key: string): Promise<string | null> {
+  await requireUser();
+  try {
+    const result = await apiFetch("/storage/presign-download", {
+      method: "POST",
+      body: JSON.stringify({ key }),
+    });
+    return result.url;
+  } catch {
+    return null;
+  }
+}
+
 export async function tenantSignOut() {
-  const supabase = await createClient();
-  await supabase.auth.signOut();
+  await apiLogout();
   redirect("/");
 }

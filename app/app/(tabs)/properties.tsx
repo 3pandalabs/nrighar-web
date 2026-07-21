@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { ScreenBackground } from "../../components/ScreenBackground";
-import { supabase } from "../../lib/supabase";
+import { api } from "../../lib/api";
 import type { Lease, Property, Tenant } from "../../lib/types";
 
 export default function PropertiesScreen() {
@@ -12,14 +12,14 @@ export default function PropertiesScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    const [{ data: props }, { data: leases }, { data: tenantRows }] = await Promise.all([
-      supabase.from("properties").select("*").order("created_at"),
-      supabase.from("leases").select("*").eq("status", "active"),
-      supabase.from("tenants").select("*"),
+    const [props, leases, tenantRows] = await Promise.all([
+      api.get<Property[]>("/properties"),
+      api.get<Lease[]>("/leases"),
+      api.get<Tenant[]>("/tenants"),
     ]);
-    setProperties((props ?? []) as Property[]);
-    setActiveLeases((leases ?? []) as Lease[]);
-    setTenants((tenantRows ?? []) as Tenant[]);
+    setProperties([...props].sort((a, b) => a.createdAt.localeCompare(b.createdAt)));
+    setActiveLeases(leases.filter((l) => l.status === "active"));
+    setTenants(tenantRows);
   }, []);
 
   useFocusEffect(
@@ -34,7 +34,7 @@ export default function PropertiesScreen() {
     setIsRefreshing(false);
   }
 
-  const leaseByProperty = new Map(activeLeases.map((l) => [l.property_id, l]));
+  const leaseByProperty = new Map(activeLeases.map((l) => [l.propertyId, l]));
   const tenantById = new Map(tenants.map((t) => [t.id, t]));
 
   return (
@@ -52,15 +52,15 @@ export default function PropertiesScreen() {
         }
         renderItem={({ item }) => {
           const lease = leaseByProperty.get(item.id);
-          const tenant = lease ? tenantById.get(lease.tenant_id) : undefined;
+          const tenant = lease ? tenantById.get(lease.tenantId) : undefined;
           return (
             <View style={styles.card}>
               <Text style={styles.nickname}>{item.nickname}</Text>
               <Text style={styles.address}>
-                {item.address_line1}, {item.city}, {item.state} {item.pincode}
+                {item.addressLine1}, {item.city}, {item.state} {item.pincode}
               </Text>
               <Text style={lease ? styles.rented : styles.vacant}>
-                {lease ? `Rented to ${tenant?.full_name ?? "tenant"}` : "Vacant"}
+                {lease ? `Rented to ${tenant?.fullName ?? "tenant"}` : "Vacant"}
               </Text>
             </View>
           );

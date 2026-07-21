@@ -1,10 +1,10 @@
 import { useCallback, useState } from "react";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { supabase } from "../../lib/supabase";
+import { api, ApiError } from "../../lib/api";
 import type { Tenant, TenantDocument, TenantProfile } from "../../lib/types";
 
-const DOC_TYPE_LABELS: Record<TenantDocument["doc_type"], string> = {
+const DOC_TYPE_LABELS: Record<TenantDocument["docType"], string> = {
   agreement: "Rent agreement",
   kyc: "ID / KYC",
   property_paper: "Property papers",
@@ -21,25 +21,23 @@ export default function TenantDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
 
   const load = useCallback(async () => {
-    const { data: tenantRow } = await supabase
-      .from("tenants")
-      .select("*")
-      .eq("id", id)
-      .maybeSingle();
-    const t = tenantRow as Tenant | null;
+    let t: Tenant | null = null;
+    try {
+      t = await api.get<Tenant>(`/tenants/${id}`);
+    } catch (err) {
+      if (!(err instanceof ApiError && err.status === 404)) throw err;
+    }
     setTenant(t);
 
-    if (t?.tenant_user_id) {
-      const [{ data: profileRow }, { data: docRows }] = await Promise.all([
-        supabase.from("tenant_profiles").select("*").eq("user_id", t.tenant_user_id).maybeSingle(),
-        supabase
-          .from("tenant_documents")
-          .select("*")
-          .eq("tenant_user_id", t.tenant_user_id)
-          .order("created_at", { ascending: false }),
+    if (t?.tenantUserId) {
+      // 404 here means the share isn't claimed (or was revoked) - not an error,
+      // just "nothing to show", same as the old RLS-gated select returning empty.
+      const [profileResult, docsResult] = await Promise.allSettled([
+        api.get<TenantProfile>(`/tenant-profiles/by-owner/${t.tenantUserId}`),
+        api.get<TenantDocument[]>(`/tenant-documents/by-owner/${t.tenantUserId}`),
       ]);
-      setProfile((profileRow as TenantProfile | null) ?? null);
-      setDocuments((docRows ?? []) as TenantDocument[]);
+      setProfile(profileResult.status === "fulfilled" ? profileResult.value : null);
+      setDocuments(docsResult.status === "fulfilled" ? docsResult.value : []);
     } else {
       setProfile(null);
       setDocuments([]);
@@ -54,11 +52,11 @@ export default function TenantDetailScreen() {
   );
 
   async function openDocument(doc: TenantDocument) {
-    const { data } = await supabase.storage
-      .from("documents")
-      .createSignedUrl(doc.storage_path, 60 * 10);
-    if (data?.signedUrl) {
-      Linking.openURL(data.signedUrl);
+    const { url } = await api.post<{ url: string }>("/storage/presign-download", {
+      key: doc.storagePath,
+    });
+    if (url) {
+      Linking.openURL(url);
     }
   }
 
@@ -75,8 +73,8 @@ export default function TenantDetailScreen() {
       ) : (
         <>
           <View style={styles.headerRow}>
-            <Text style={styles.name}>{tenant.full_name}</Text>
-            {(profile?.kyc_status ?? tenant.kyc_status) === "verified" && (
+            <Text style={styles.name}>{tenant.fullName}</Text>
+            {(profile?.kycStatus ?? tenant.kycStatus) === "verified" && (
               <Text style={styles.badgeVerified}>Verified ✓</Text>
             )}
           </View>
@@ -84,17 +82,17 @@ export default function TenantDetailScreen() {
             {[tenant.phone, tenant.email].filter(Boolean).join(" · ")}
           </Text>
 
-          {tenant.tenant_user_id ? (
+          {tenant.tenantUserId ? (
             profile ? (
               <>
                 <View style={styles.card}>
                   <Text style={styles.sectionTitle}>Shared renter profile</Text>
-                  <ProfileRow label="Full name" value={profile.full_name} />
+                  <ProfileRow label="Full name" value={profile.fullName} />
                   <ProfileRow label="Phone" value={profile.phone} />
                   <ProfileRow label="Email" value={profile.email} />
-                  <ProfileRow label="Current city" value={profile.current_city} />
+                  <ProfileRow label="Current city" value={profile.currentCity} />
                   <ProfileRow label="Employer" value={profile.employer} />
-                  <ProfileRow label="KYC status" value={profile.kyc_status} />
+                  <ProfileRow label="KYC status" value={profile.kycStatus} />
                 </View>
 
                 <View style={styles.card}>
@@ -108,7 +106,7 @@ export default function TenantDetailScreen() {
                         <Text style={styles.docTitle} numberOfLines={1}>
                           {doc.title}
                         </Text>
-                        <Text style={styles.docType}>{DOC_TYPE_LABELS[doc.doc_type]}</Text>
+                        <Text style={styles.docType}>{DOC_TYPE_LABELS[doc.docType]}</Text>
                       </View>
                       <Text style={styles.link}>Open</Text>
                     </Pressable>

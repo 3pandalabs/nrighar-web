@@ -1,25 +1,21 @@
-import { createClient } from "@/lib/supabase/server";
+import { publicGet } from "@/lib/api/public";
 import { IntakeForm } from "./intake-form";
 
 type IntakeLinkData = {
   status: "pending" | "submitted";
   expired: boolean;
-  owner_name: string;
-  property_nickname: string | null;
-  property_city: string | null;
+  ownerName: string;
+  propertyNickname: string | null;
+  propertyCity: string | null;
 };
 
 export default async function JoinPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
 
   const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  let data: IntakeLinkData | null = null;
-
-  if (uuidPattern.test(token)) {
-    const supabase = await createClient();
-    const { data: result } = await supabase.rpc("get_intake_link", { p_token: token });
-    data = (result as IntakeLinkData | null) ?? null;
-  }
+  const data = uuidPattern.test(token)
+    ? await publicGet<IntakeLinkData>(`/intake-links/${token}`)
+    : null;
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-50 px-6 py-12 dark:bg-black">
@@ -44,9 +40,9 @@ export default async function JoinPage({ params }: { params: Promise<{ token: st
               Tenant details
             </h1>
             <p className="mb-6 text-sm text-zinc-500">
-              {data.owner_name} has asked for your details
-              {data.property_nickname
-                ? ` for ${data.property_nickname}, ${data.property_city}`
+              {data.ownerName} has asked for your details
+              {data.propertyNickname
+                ? ` for ${data.propertyNickname}, ${data.propertyCity}`
                 : ""}{" "}
               to set up your tenancy.
             </p>

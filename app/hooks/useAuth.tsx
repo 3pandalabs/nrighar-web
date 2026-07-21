@@ -1,11 +1,17 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import type { Session } from "@supabase/supabase-js";
-import { supabase } from "../lib/supabase";
+import {
+  ApiError,
+  getCurrentUser,
+  login as apiLogin,
+  logout as apiLogout,
+  signup as apiSignup,
+  type AuthUser,
+} from "../lib/api";
 
-type Role = "owner" | "tenant";
+type Role = AuthUser["role"];
 
 type AuthContextValue = {
-  session: Session | null;
+  user: AuthUser | null;
   role: Role | null;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
@@ -15,66 +21,61 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+function friendlyError(err: unknown): string {
+  if (err instanceof ApiError) {
+    switch (err.code) {
+      case "invalid_credentials":
+        return "Incorrect email or password.";
+      case "email_taken":
+        return "An account with this email already exists.";
+      default:
+        return err.code.replace(/_/g, " ");
+    }
+  }
+  return "Something went wrong. Please try again.";
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [role, setRole] = useState<Role | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // role now comes back directly on the user object from /auth/me or the
+  // signup/login response - no separate profiles lookup, and no more
+  // "no profile row yet -> assume owner" fallback (the API creates the
+  // profile atomically inside the signup transaction).
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      if (!data.session) {
-        setIsLoading(false);
-      }
-    });
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession);
-      if (!newSession) {
-        setRole(null);
-      }
-    });
-
-    return () => listener.subscription.unsubscribe();
+    getCurrentUser()
+      .then(setUser)
+      .finally(() => setIsLoading(false));
   }, []);
 
-  // Role rides along with the session; accounts without a profiles row are
-  // treated as owners (matches the database default).
-  useEffect(() => {
-    if (!session) return;
-    let cancelled = false;
-    supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", session.user.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!cancelled) {
-          setRole((data?.role as Role | undefined) ?? "owner");
-          setIsLoading(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [session]);
-
   async function signIn(email: string, password: string) {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error?.message ?? null };
+    try {
+      setUser(await apiLogin(email, password));
+      return { error: null };
+    } catch (err) {
+      return { error: friendlyError(err) };
+    }
   }
 
   async function signUp(email: string, password: string) {
-    const { error } = await supabase.auth.signUp({ email, password });
-    return { error: error?.message ?? null };
+    try {
+      setUser(await apiSignup(email, password));
+      return { error: null };
+    } catch (err) {
+      return { error: friendlyError(err) };
+    }
   }
 
   async function signOut() {
-    await supabase.auth.signOut();
+    await apiLogout();
+    setUser(null);
   }
 
   return (
-    <AuthContext.Provider value={{ session, role, isLoading, signIn, signUp, signOut }}>
+    <AuthContext.Provider
+      value={{ user, role: user?.role ?? null, isLoading, signIn, signUp, signOut }}
+    >
       {children}
     </AuthContext.Provider>
   );

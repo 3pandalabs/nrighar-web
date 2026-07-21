@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { getUploadUrl, recordTenantDocument } from "./actions";
 
 const DOC_TYPES = [
   ["kyc", "ID / KYC"],
@@ -28,41 +28,20 @@ export function TenantDocUpload() {
     setError(null);
     setIsUploading(true);
 
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      setError("Not signed in.");
+    try {
+      const { key, url } = await getUploadUrl(file.name.replace(/[^\w.\-]/g, "_"));
+      const putRes = await fetch(url, { method: "PUT", body: file });
+      if (!putRes.ok) {
+        throw new Error("Could not upload the file — please try again.");
+      }
+      await recordTenantDocument({ docType, title: file.name, storagePath: key });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
       setIsUploading(false);
       return;
     }
-
-    const storagePath = `${user.id}/${crypto.randomUUID()}-${file.name.replace(/[^\w.\-]/g, "_")}`;
-    const { error: uploadError } = await supabase.storage
-      .from("documents")
-      .upload(storagePath, file);
-
-    if (uploadError) {
-      setError(uploadError.message);
-      setIsUploading(false);
-      return;
-    }
-
-    const { error: insertError } = await supabase.from("tenant_documents").insert({
-      tenant_user_id: user.id,
-      doc_type: docType,
-      title: file.name,
-      storage_path: storagePath,
-    });
 
     setIsUploading(false);
-    if (insertError) {
-      setError(insertError.message);
-      return;
-    }
-
     setFile(null);
     router.refresh();
   }

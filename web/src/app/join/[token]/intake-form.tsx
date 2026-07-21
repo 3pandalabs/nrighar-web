@@ -1,19 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import {
+  acceptIntakeLink,
+  getTenantUploadUrl,
+  mintProfileShare,
+  recordTenantDocument,
+  saveNewTenantProfile,
+  signInTenant,
+  signUpTenant,
+} from "./actions";
 
 const MAX_FILES = 6;
 const MAX_FILE_MB = 10;
 
-type RpcResult = { ok?: boolean; error?: string } | null;
-
-const RPC_ERRORS: Record<string, string> = {
+const ERRORS: Record<string, string> = {
   not_found: "This link doesn't exist anymore — ask your landlord for a fresh one.",
   already_used: "This link was already used.",
   expired: "This link has expired — ask your landlord for a fresh one.",
   no_tenant_profile: "This account has no renter profile — sign in with your tenant account.",
   not_signed_in: "Please sign in first.",
+  invalid_credentials: "Incorrect email or password.",
+  conflict: "An account with that email already exists — try signing in instead.",
 };
 
 export function IntakeForm({ token }: { token: string }) {
@@ -34,18 +42,6 @@ export function IntakeForm({ token }: { token: string }) {
     setIsSubmitting(false);
   }
 
-  async function acceptIntake(supabase: ReturnType<typeof createClient>): Promise<boolean> {
-    const { data, error: rpcError } = await supabase.rpc("accept_intake_as_tenant", {
-      p_token: token,
-    });
-    const result = data as RpcResult;
-    if (rpcError || !result?.ok) {
-      fail(RPC_ERRORS[result?.error ?? ""] ?? rpcError?.message ?? "Something went wrong.");
-      return false;
-    }
-    return true;
-  }
-
   async function handleNewProfile(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -60,57 +56,37 @@ export function IntakeForm({ token }: { token: string }) {
     }
 
     setIsSubmitting(true);
-    const supabase = createClient();
 
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-    if (signUpError) return fail(signUpError.message);
-    const user = signUpData.user;
-    if (!user || !signUpData.session) {
-      return fail("Could not create your account — please try again.");
+    const signUpResult = await signUpTenant(email, password);
+    if (!signUpResult.ok) {
+      return fail(ERRORS[signUpResult.error] ?? "Could not create your account — please try again.");
     }
 
-    const { error: roleError } = await supabase
-      .from("profiles")
-      .upsert({ id: user.id, role: "tenant" });
-    if (roleError) return fail(roleError.message);
-
-    const { error: profileError } = await supabase.from("tenant_profiles").upsert({
-      user_id: user.id,
-      full_name: fullName.trim(),
-      phone: phone.trim() || null,
+    await saveNewTenantProfile({
+      fullName: fullName.trim(),
+      phone: phone.trim() || undefined,
       email,
-      current_city: city.trim() || null,
-      kyc_status: selected.length > 0 ? "submitted" : "pending",
+      currentCity: city.trim() || undefined,
+      kycStatus: selected.length > 0 ? "submitted" : "pending",
     });
-    if (profileError) return fail(profileError.message);
 
     for (const f of selected) {
-      const path = `${user.id}/${crypto.randomUUID()}-${f.name.replace(/[^\w.\-]/g, "_")}`;
-      const { error: uploadError } = await supabase.storage.from("documents").upload(path, f);
-      if (uploadError) return fail(`Could not upload ${f.name}: ${uploadError.message}`);
-      const { error: docError } = await supabase.from("tenant_documents").insert({
-        tenant_user_id: user.id,
-        doc_type: "kyc",
-        title: f.name,
-        storage_path: path,
-      });
-      if (docError) return fail(docError.message);
+      try {
+        const { key, url } = await getTenantUploadUrl(f.name.replace(/[^\w.\-]/g, "_"));
+        const putRes = await fetch(url, { method: "PUT", body: f });
+        if (!putRes.ok) return fail(`Could not upload ${f.name}.`);
+        await recordTenantDocument({ docType: "kyc", title: f.name, storagePath: key });
+      } catch {
+        return fail(`Could not upload ${f.name}.`);
+      }
     }
 
-    if (!(await acceptIntake(supabase))) return;
+    const acceptResult = await acceptIntakeLink(token);
+    if (!acceptResult.ok) return fail(ERRORS[acceptResult.error] ?? "Something went wrong.");
 
     // Mint a reusable open share link the tenant can give any future landlord.
-    const { data: share } = await supabase
-      .from("profile_shares")
-      .insert({ tenant_user_id: user.id })
-      .select("id")
-      .single();
-    if (share) {
-      setDoneShareUrl(`${window.location.origin}/profile-share/${share.id}`);
-    }
+    const shareToken = await mintProfileShare();
+    setDoneShareUrl(`${window.location.origin}/profile-share/${shareToken}`);
     setDone(true);
   }
 
@@ -119,11 +95,11 @@ export function IntakeForm({ token }: { token: string }) {
     setError(null);
     setIsSubmitting(true);
 
-    const supabase = createClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-    if (signInError) return fail(signInError.message);
+    const signInResult = await signInTenant(email, password);
+    if (!signInResult.ok) return fail(ERRORS[signInResult.error] ?? "Incorrect email or password.");
 
-    if (!(await acceptIntake(supabase))) return;
+    const acceptResult = await acceptIntakeLink(token);
+    if (!acceptResult.ok) return fail(ERRORS[acceptResult.error] ?? "Something went wrong.");
     setDone(true);
   }
 

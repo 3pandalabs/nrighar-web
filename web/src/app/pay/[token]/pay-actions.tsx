@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
-import { createClient } from "@/lib/supabase/client";
+import { publicPost } from "@/lib/api/public";
 import { buildUpiUri } from "@/lib/upi";
 
 export function PayActions({
@@ -34,8 +34,7 @@ export function PayActions({
   useEffect(() => {
     if (trackedRef.current) return;
     trackedRef.current = true;
-    const supabase = createClient();
-    supabase.rpc("mark_pay_link_opened", { p_token: token }).then(() => {});
+    publicPost(`/pay-links/${token}/open`).catch(() => {});
   }, [token]);
 
   useEffect(() => {
@@ -50,8 +49,7 @@ export function PayActions({
 
   async function handleClaim() {
     setIsClaiming(true);
-    const supabase = createClient();
-    await supabase.rpc("claim_pay_link_paid", { p_token: token });
+    await publicPost(`/pay-links/${token}/claim-paid`).catch(() => {});
     setIsClaiming(false);
     setClaimed(true);
   }

@@ -1,104 +1,107 @@
+// Mirrors api/ROUTES.md response shapes (camelCase) — this API is now the
+// source of truth for these shapes, not a Postgres/Supabase table anymore.
+
 export type Profile = {
   id: string;
-  display_name: string | null;
-  country_of_residence: string | null;
-  preferred_currency: string;
-  upi_vpa: string | null;
-  upi_name: string | null;
+  displayName: string | null;
+  countryOfResidence: string | null;
+  preferredCurrency: string;
+  upiVpa: string | null;
+  upiName: string | null;
   role: "owner" | "tenant";
 };
 
 export type TenantProfile = {
-  user_id: string;
-  full_name: string;
+  userId: string;
+  fullName: string;
   phone: string | null;
   email: string | null;
-  current_city: string | null;
+  currentCity: string | null;
   employer: string | null;
-  kyc_status: "pending" | "submitted" | "verified";
-  created_at: string;
+  kycStatus: "pending" | "submitted" | "verified";
+  createdAt: string;
 };
 
 export type TenantDocument = {
   id: string;
-  tenant_user_id: string;
-  doc_type: "agreement" | "kyc" | "property_paper" | "tax" | "other";
+  tenantUserId: string;
+  docType: "agreement" | "kyc" | "property_paper" | "tax" | "other";
   title: string;
-  storage_path: string;
-  created_at: string;
+  storagePath: string;
+  createdAt: string;
 };
 
 export type ProfileShare = {
   id: string;
-  tenant_user_id: string;
-  owner_id: string | null;
+  tenantUserId: string;
+  ownerId: string | null;
   status: "open" | "claimed" | "revoked";
-  created_at: string;
-  claimed_at: string | null;
-  revoked_at: string | null;
+  createdAt: string;
+  claimedAt: string | null;
+  revokedAt: string | null;
 };
 
 export type PayLink = {
   id: string;
-  owner_id: string;
-  lease_id: string;
-  period_year: number;
-  period_month: number;
-  amount_due: number;
-  opened_at: string | null;
-  claimed_paid_at: string | null;
-  created_at: string;
+  ownerId: string;
+  leaseId: string;
+  periodYear: number;
+  periodMonth: number;
+  amountDue: number;
+  openedAt: string | null;
+  claimedPaidAt: string | null;
+  createdAt: string;
 };
 
 export type Property = {
   id: string;
-  owner_id: string;
+  ownerId: string;
   nickname: string;
-  address_line1: string;
-  address_line2: string | null;
+  addressLine1: string;
+  addressLine2: string | null;
   city: string;
   state: string;
   pincode: string;
-  property_type: "apartment" | "independent_house" | "villa" | "plot" | "commercial";
+  propertyType: "apartment" | "independent_house" | "villa" | "plot" | "commercial";
   notes: string | null;
-  created_at: string;
+  createdAt: string;
 };
 
 export type Tenant = {
   id: string;
-  owner_id: string;
-  full_name: string;
+  ownerId: string;
+  fullName: string;
   phone: string | null;
   email: string | null;
-  kyc_status: "pending" | "submitted" | "verified";
+  kycStatus: "pending" | "submitted" | "verified";
   notes: string | null;
-  tenant_user_id: string | null;
-  created_at: string;
+  tenantUserId: string | null;
+  createdAt: string;
 };
 
 export type Lease = {
   id: string;
-  owner_id: string;
-  property_id: string;
-  tenant_id: string;
-  rent_amount: number;
-  deposit_amount: number | null;
-  start_date: string;
-  end_date: string | null;
-  rent_due_day: number;
+  ownerId: string;
+  propertyId: string;
+  tenantId: string;
+  rentAmount: number;
+  depositAmount: number | null;
+  startDate: string;
+  endDate: string | null;
+  rentDueDay: number;
   status: "active" | "ended";
-  created_at: string;
+  createdAt: string;
 };
 
 export type RentPayment = {
   id: string;
-  owner_id: string;
-  lease_id: string;
-  period_year: number;
-  period_month: number;
-  amount_due: number;
-  amount_paid: number | null;
-  paid_on: string | null;
+  ownerId: string;
+  leaseId: string;
+  periodYear: number;
+  periodMonth: number;
+  amountDue: number;
+  amountPaid: number | null;
+  paidOn: string | null;
   method: "bank_transfer" | "upi" | "cash" | "other" | null;
   status: "due" | "paid" | "partial";
   notes: string | null;
@@ -106,22 +109,22 @@ export type RentPayment = {
 
 export type IntakeLink = {
   id: string;
-  owner_id: string;
-  property_id: string | null;
+  ownerId: string;
+  propertyId: string | null;
   status: "pending" | "submitted";
-  tenant_id: string | null;
-  created_at: string;
-  submitted_at: string | null;
-  expires_at: string;
+  tenantId: string | null;
+  createdAt: string;
+  submittedAt: string | null;
+  expiresAt: string;
 };
 
 export type DocumentRow = {
   id: string;
-  owner_id: string;
-  property_id: string | null;
-  lease_id: string | null;
-  doc_type: "agreement" | "kyc" | "property_paper" | "tax" | "other";
+  ownerId: string;
+  propertyId: string | null;
+  leaseId: string | null;
+  docType: "agreement" | "kyc" | "property_paper" | "tax" | "other";
   title: string;
-  storage_path: string;
-  created_at: string;
+  storagePath: string;
+  createdAt: string;
 };

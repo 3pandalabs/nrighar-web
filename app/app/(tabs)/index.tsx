@@ -3,11 +3,11 @@ import { useFocusEffect } from "expo-router";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { ScreenBackground } from "../../components/ScreenBackground";
 import { useAuth } from "../../hooks/useAuth";
-import { supabase } from "../../lib/supabase";
-import { formatInr, type Lease, type RentPayment } from "../../lib/types";
+import { api } from "../../lib/api";
+import { formatInr, type Lease, type Property, type RentPayment } from "../../lib/types";
 
 export default function OverviewScreen() {
-  const { session, signOut } = useAuth();
+  const { user, signOut } = useAuth();
   const [propertyCount, setPropertyCount] = useState(0);
   const [expected, setExpected] = useState(0);
   const [collected, setCollected] = useState(0);
@@ -19,25 +19,23 @@ export default function OverviewScreen() {
     const year = now.getFullYear();
     const month = now.getMonth() + 1;
 
-    const [{ count }, { data: leases }, { data: payments }] = await Promise.all([
-      supabase.from("properties").select("id", { count: "exact", head: true }),
-      supabase.from("leases").select("*").eq("status", "active"),
-      supabase
-        .from("rent_payments")
-        .select("*")
-        .eq("period_year", year)
-        .eq("period_month", month),
+    const [properties, leases, payments] = await Promise.all([
+      api.get<Property[]>("/properties"),
+      api.get<Lease[]>("/leases"),
+      api.get<RentPayment[]>("/rent-payments"),
     ]);
 
-    const activeLeases = (leases ?? []) as Lease[];
-    const monthPayments = (payments ?? []) as RentPayment[];
+    const activeLeases = leases.filter((l) => l.status === "active");
+    const monthPayments = payments.filter(
+      (p) => p.periodYear === year && p.periodMonth === month
+    );
     const paidLeaseIds = new Set(
-      monthPayments.filter((p) => p.status === "paid").map((p) => p.lease_id)
+      monthPayments.filter((p) => p.status === "paid").map((p) => p.leaseId)
     );
 
-    setPropertyCount(count ?? 0);
-    setExpected(activeLeases.reduce((sum, l) => sum + Number(l.rent_amount), 0));
-    setCollected(monthPayments.reduce((sum, p) => sum + Number(p.amount_paid ?? 0), 0));
+    setPropertyCount(properties.length);
+    setExpected(activeLeases.reduce((sum, l) => sum + Number(l.rentAmount), 0));
+    setCollected(monthPayments.reduce((sum, p) => sum + Number(p.amountPaid ?? 0), 0));
     setPendingCount(activeLeases.filter((l) => !paidLeaseIds.has(l.id)).length);
   }, []);
 
@@ -74,7 +72,7 @@ export default function OverviewScreen() {
           <StatCard label="Collected" value={formatInr(collected)} />
         </View>
 
-        <Text style={styles.email}>{session?.user.email}</Text>
+        <Text style={styles.email}>{user?.email}</Text>
         <Pressable style={styles.signOutButton} onPress={signOut}>
           <Text style={styles.signOutText}>Sign out</Text>
         </Pressable>

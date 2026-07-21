@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { claimProfileShare } from "./actions";
 
 const ERRORS: Record<string, string> = {
   not_found: "This share link doesn't exist anymore.",
@@ -20,17 +20,13 @@ export function ClaimButton({ token }: { token: string }) {
   async function handleClaim() {
     setError(null);
     setIsWorking(true);
-    const supabase = createClient();
-    const { data, error: rpcError } = await supabase.rpc("claim_profile_share", {
-      p_token: token,
-    });
-    const result = data as { ok?: boolean; tenant_id?: string; error?: string } | null;
-    if (rpcError || !result?.ok) {
-      setError(ERRORS[result?.error ?? ""] ?? rpcError?.message ?? "Something went wrong.");
-      setIsWorking(false);
+    const result = await claimProfileShare(token);
+    setIsWorking(false);
+    if (!result.ok) {
+      setError(ERRORS[result.error] ?? "Something went wrong.");
       return;
     }
-    router.push(`/dashboard/tenants/${result.tenant_id}`);
+    router.push(`/dashboard/tenants/${result.tenantId}`);
     router.refresh();
   }
 

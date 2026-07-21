@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { getUploadUrl, recordDocument } from "../actions";
 
 const DOC_TYPES = [
   ["agreement", "Rent agreement"],
@@ -27,44 +27,25 @@ export function UploadForm({ properties }: { properties: { id: string; nickname:
     setError(null);
     setIsUploading(true);
 
-    const supabase = createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      setError("Not signed in.");
+    try {
+      const { key, url } = await getUploadUrl(file.name);
+      const putRes = await fetch(url, { method: "PUT", body: file });
+      if (!putRes.ok) {
+        throw new Error("Could not upload the file — please try again.");
+      }
+      await recordDocument({
+        propertyId: propertyId || undefined,
+        docType,
+        title: title.trim() || file.name,
+        storagePath: key,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
       setIsUploading(false);
       return;
     }
-
-    const storagePath = `${user.id}/${crypto.randomUUID()}-${file.name}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("documents")
-      .upload(storagePath, file);
-
-    if (uploadError) {
-      setError(uploadError.message);
-      setIsUploading(false);
-      return;
-    }
-
-    const { error: insertError } = await supabase.from("documents").insert({
-      owner_id: user.id,
-      property_id: propertyId || null,
-      doc_type: docType,
-      title: title.trim() || file.name,
-      storage_path: storagePath,
-    });
 
     setIsUploading(false);
-
-    if (insertError) {
-      setError(insertError.message);
-      return;
-    }
-
     setFile(null);
     setTitle("");
     router.refresh();

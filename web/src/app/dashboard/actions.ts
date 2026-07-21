@@ -1,92 +1,81 @@
 "use server";
 
+import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { apiFetch, apiGetCurrentUser, apiLogout } from "@/lib/api/client";
 
 async function requireUser() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await apiGetCurrentUser();
   if (!user) {
     redirect("/login");
   }
-  return { supabase, user };
+  return user;
 }
 
 export async function signOut() {
-  const supabase = await createClient();
-  await supabase.auth.signOut();
+  await apiLogout();
   redirect("/");
 }
 
 export async function addProperty(formData: FormData) {
-  const { supabase, user } = await requireUser();
+  await requireUser();
 
-  const { error } = await supabase.from("properties").insert({
-    owner_id: user.id,
-    nickname: String(formData.get("nickname") ?? "").trim(),
-    address_line1: String(formData.get("address_line1") ?? "").trim(),
-    address_line2: String(formData.get("address_line2") ?? "").trim() || null,
-    city: String(formData.get("city") ?? "").trim(),
-    state: String(formData.get("state") ?? "").trim(),
-    pincode: String(formData.get("pincode") ?? "").trim(),
-    property_type: String(formData.get("property_type") ?? "apartment"),
-    notes: String(formData.get("notes") ?? "").trim() || null,
+  await apiFetch("/properties", {
+    method: "POST",
+    body: JSON.stringify({
+      nickname: String(formData.get("nickname") ?? "").trim(),
+      addressLine1: String(formData.get("address_line1") ?? "").trim(),
+      addressLine2: String(formData.get("address_line2") ?? "").trim() || undefined,
+      city: String(formData.get("city") ?? "").trim(),
+      state: String(formData.get("state") ?? "").trim(),
+      pincode: String(formData.get("pincode") ?? "").trim(),
+      propertyType: String(formData.get("property_type") ?? "apartment"),
+      notes: String(formData.get("notes") ?? "").trim() || undefined,
+    }),
   });
-
-  if (error) {
-    throw new Error(`Could not add property: ${error.message}`);
-  }
 
   revalidatePath("/dashboard/properties");
   revalidatePath("/dashboard");
 }
 
 export async function addTenant(formData: FormData) {
-  const { supabase, user } = await requireUser();
+  await requireUser();
 
-  const { error } = await supabase.from("tenants").insert({
-    owner_id: user.id,
-    full_name: String(formData.get("full_name") ?? "").trim(),
-    phone: String(formData.get("phone") ?? "").trim() || null,
-    email: String(formData.get("email") ?? "").trim() || null,
-    kyc_status: String(formData.get("kyc_status") ?? "pending"),
-    notes: String(formData.get("notes") ?? "").trim() || null,
+  await apiFetch("/tenants", {
+    method: "POST",
+    body: JSON.stringify({
+      fullName: String(formData.get("full_name") ?? "").trim(),
+      phone: String(formData.get("phone") ?? "").trim() || undefined,
+      email: String(formData.get("email") ?? "").trim() || undefined,
+      kycStatus: String(formData.get("kyc_status") ?? "pending"),
+      notes: String(formData.get("notes") ?? "").trim() || undefined,
+    }),
   });
-
-  if (error) {
-    throw new Error(`Could not add tenant: ${error.message}`);
-  }
 
   revalidatePath("/dashboard/tenants");
   revalidatePath("/dashboard");
 }
 
 export async function addLease(formData: FormData) {
-  const { supabase, user } = await requireUser();
+  await requireUser();
 
   const propertyId = String(formData.get("property_id") ?? "");
   const endDate = String(formData.get("end_date") ?? "").trim();
 
-  const { error } = await supabase.from("leases").insert({
-    owner_id: user.id,
-    property_id: propertyId,
-    tenant_id: String(formData.get("tenant_id") ?? ""),
-    rent_amount: Number(formData.get("rent_amount") ?? 0),
-    deposit_amount: formData.get("deposit_amount")
-      ? Number(formData.get("deposit_amount"))
-      : null,
-    start_date: String(formData.get("start_date") ?? ""),
-    end_date: endDate || null,
-    rent_due_day: Number(formData.get("rent_due_day") ?? 1),
-    status: "active",
+  await apiFetch("/leases", {
+    method: "POST",
+    body: JSON.stringify({
+      propertyId,
+      tenantId: String(formData.get("tenant_id") ?? ""),
+      rentAmount: Number(formData.get("rent_amount") ?? 0),
+      depositAmount: formData.get("deposit_amount") ? Number(formData.get("deposit_amount")) : undefined,
+      startDate: String(formData.get("start_date") ?? ""),
+      endDate: endDate || undefined,
+      rentDueDay: Number(formData.get("rent_due_day") ?? 1),
+      status: "active",
+    }),
   });
-
-  if (error) {
-    throw new Error(`Could not create lease: ${error.message}`);
-  }
 
   revalidatePath(`/dashboard/properties/${propertyId}`);
   revalidatePath("/dashboard/rent");
@@ -94,67 +83,56 @@ export async function addLease(formData: FormData) {
 }
 
 export async function endLease(formData: FormData) {
-  const { supabase } = await requireUser();
+  await requireUser();
 
   const leaseId = String(formData.get("lease_id") ?? "");
-  const { error } = await supabase
-    .from("leases")
-    .update({ status: "ended", end_date: new Date().toISOString().slice(0, 10) })
-    .eq("id", leaseId);
-
-  if (error) {
-    throw new Error(`Could not end lease: ${error.message}`);
-  }
+  await apiFetch(`/leases/${leaseId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status: "ended", endDate: new Date().toISOString().slice(0, 10) }),
+  });
 
   revalidatePath("/dashboard/rent");
   revalidatePath("/dashboard");
 }
 
 export async function recordPayment(formData: FormData) {
-  const { supabase, user } = await requireUser();
+  await requireUser();
 
   const amountDue = Number(formData.get("amount_due") ?? 0);
   const amountPaid = Number(formData.get("amount_paid") ?? 0);
 
-  const { error } = await supabase.from("rent_payments").upsert(
-    {
-      owner_id: user.id,
-      lease_id: String(formData.get("lease_id") ?? ""),
-      period_year: Number(formData.get("period_year") ?? 0),
-      period_month: Number(formData.get("period_month") ?? 0),
-      amount_due: amountDue,
-      amount_paid: amountPaid,
-      paid_on: String(formData.get("paid_on") ?? "") || new Date().toISOString().slice(0, 10),
+  await apiFetch("/rent-payments", {
+    method: "PUT",
+    body: JSON.stringify({
+      leaseId: String(formData.get("lease_id") ?? ""),
+      periodYear: Number(formData.get("period_year") ?? 0),
+      periodMonth: Number(formData.get("period_month") ?? 0),
+      amountDue,
+      amountPaid,
+      paidOn: String(formData.get("paid_on") ?? "") || new Date().toISOString().slice(0, 10),
       method: String(formData.get("method") ?? "bank_transfer"),
       status: amountPaid >= amountDue ? "paid" : "partial",
-      notes: String(formData.get("notes") ?? "").trim() || null,
-    },
-    { onConflict: "lease_id,period_year,period_month" }
-  );
-
-  if (error) {
-    throw new Error(`Could not record payment: ${error.message}`);
-  }
+      notes: String(formData.get("notes") ?? "").trim() || undefined,
+    }),
+  });
 
   revalidatePath("/dashboard/rent");
   revalidatePath("/dashboard");
 }
 
 export async function saveProfile(formData: FormData) {
-  const { supabase, user } = await requireUser();
+  await requireUser();
 
-  const { error } = await supabase.from("profiles").upsert({
-    id: user.id,
-    display_name: String(formData.get("display_name") ?? "").trim() || null,
-    country_of_residence: String(formData.get("country_of_residence") ?? "").trim() || null,
-    preferred_currency: String(formData.get("preferred_currency") ?? "USD"),
-    upi_vpa: String(formData.get("upi_vpa") ?? "").trim() || null,
-    upi_name: String(formData.get("upi_name") ?? "").trim() || null,
+  await apiFetch("/profile", {
+    method: "PATCH",
+    body: JSON.stringify({
+      displayName: String(formData.get("display_name") ?? "").trim() || undefined,
+      countryOfResidence: String(formData.get("country_of_residence") ?? "").trim() || undefined,
+      preferredCurrency: String(formData.get("preferred_currency") ?? "USD"),
+      upiVpa: String(formData.get("upi_vpa") ?? "").trim() || undefined,
+      upiName: String(formData.get("upi_name") ?? "").trim() || undefined,
+    }),
   });
-
-  if (error) {
-    throw new Error(`Could not save profile: ${error.message}`);
-  }
 
   revalidatePath("/dashboard");
   redirect("/dashboard/settings?saved=1");
@@ -170,38 +148,20 @@ export async function createWhatsAppReminderUrl(input: {
   propertyNickname: string;
   monthLabel: string;
 }): Promise<string> {
-  const { supabase, user } = await requireUser();
+  await requireUser();
 
   const { leaseId, periodYear, periodMonth, amount, phone, tenantName, propertyNickname, monthLabel } =
     input;
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("upi_vpa")
-    .eq("id", user.id)
-    .maybeSingle();
+  const profile = await apiFetch("/profile").catch(() => null);
 
   // A pay link is only useful if the owner has a UPI ID for the page to show.
   let payLinkUrl: string | null = null;
-  if (profile?.upi_vpa) {
-    const { data: payLink, error } = await supabase
-      .from("pay_links")
-      .upsert(
-        {
-          owner_id: user.id,
-          lease_id: leaseId,
-          period_year: periodYear,
-          period_month: periodMonth,
-          amount_due: amount,
-        },
-        { onConflict: "lease_id,period_year,period_month" }
-      )
-      .select("id")
-      .single();
-
-    if (error) {
-      throw new Error(`Could not create pay link: ${error.message}`);
-    }
+  if (profile?.upiVpa) {
+    const payLink = await apiFetch(`/leases/${leaseId}/pay-links`, {
+      method: "POST",
+      body: JSON.stringify({ periodYear, periodMonth, amountDue: amount }),
+    });
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://nrighar.3pandalabs.com";
     payLinkUrl = `${siteUrl}/pay/${payLink.id}`;
@@ -225,49 +185,66 @@ export async function createWhatsAppReminderUrl(input: {
 }
 
 export async function createIntakeLink(formData: FormData) {
-  const { supabase, user } = await requireUser();
+  await requireUser();
 
   const propertyId = String(formData.get("property_id") ?? "");
-  const { error } = await supabase.from("intake_links").insert({
-    owner_id: user.id,
-    property_id: propertyId || null,
+  await apiFetch("/intake-links", {
+    method: "POST",
+    body: JSON.stringify({ propertyId: propertyId || undefined }),
   });
-
-  if (error) {
-    throw new Error(`Could not create invite link: ${error.message}`);
-  }
 
   revalidatePath("/dashboard/tenants");
 }
 
 export async function deleteIntakeLink(formData: FormData) {
-  const { supabase } = await requireUser();
+  await requireUser();
 
   const id = String(formData.get("id") ?? "");
-  const { error } = await supabase.from("intake_links").delete().eq("id", id);
-
-  if (error) {
-    throw new Error(`Could not delete invite link: ${error.message}`);
-  }
+  await apiFetch(`/intake-links/${id}`, { method: "DELETE" });
 
   revalidatePath("/dashboard/tenants");
 }
 
 export async function deleteDocument(formData: FormData) {
-  const { supabase } = await requireUser();
+  await requireUser();
 
   const id = String(formData.get("id") ?? "");
-  const storagePath = String(formData.get("storage_path") ?? "");
-
-  const { error: storageError } = await supabase.storage.from("documents").remove([storagePath]);
-  if (storageError) {
-    throw new Error(`Could not delete file: ${storageError.message}`);
-  }
-
-  const { error } = await supabase.from("documents").delete().eq("id", id);
-  if (error) {
-    throw new Error(`Could not delete document: ${error.message}`);
-  }
+  // NOTE: api/ROUTES.md has no storage-object-delete route yet — this removes
+  // the metadata row only; the R2 object is orphaned until that route exists.
+  await apiFetch(`/documents/${id}`, { method: "DELETE" });
 
   revalidatePath("/dashboard/documents");
+}
+
+export async function getUploadUrl(filename: string): Promise<{ key: string; url: string }> {
+  const user = await requireUser();
+  const key = `${user.id}/${randomUUID()}-${filename}`;
+  const result = await apiFetch("/storage/presign-upload", {
+    method: "POST",
+    body: JSON.stringify({ key }),
+  });
+  return { key, url: result.url };
+}
+
+export async function recordDocument(input: {
+  propertyId?: string;
+  docType: string;
+  title: string;
+  storagePath: string;
+}) {
+  await requireUser();
+  await apiFetch("/documents", { method: "POST", body: JSON.stringify(input) });
+}
+
+export async function getDownloadUrl(key: string): Promise<string | null> {
+  await requireUser();
+  try {
+    const result = await apiFetch("/storage/presign-download", {
+      method: "POST",
+      body: JSON.stringify({ key }),
+    });
+    return result.url;
+  } catch {
+    return null;
+  }
 }

@@ -12,25 +12,25 @@ import {
 } from "react-native";
 import { ScreenBackground } from "../../components/ScreenBackground";
 import { useAuth } from "../../hooks/useAuth";
-import { supabase } from "../../lib/supabase";
+import { api, ApiError } from "../../lib/api";
 import { SITE_URL } from "../../lib/constants";
 import type { IntakeLink, Tenant } from "../../lib/types";
 
 export default function TenantsScreen() {
   const router = useRouter();
-  const { session } = useAuth();
+  const { user } = useAuth();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [invites, setInvites] = useState<IntakeLink[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isInviting, setIsInviting] = useState(false);
 
   const load = useCallback(async () => {
-    const [{ data: tenantRows }, { data: inviteRows }] = await Promise.all([
-      supabase.from("tenants").select("*").order("full_name"),
-      supabase.from("intake_links").select("*").order("created_at", { ascending: false }),
+    const [tenantRows, inviteRows] = await Promise.all([
+      api.get<Tenant[]>("/tenants"),
+      api.get<IntakeLink[]>("/intake-links"),
     ]);
-    setTenants((tenantRows ?? []) as Tenant[]);
-    setInvites((inviteRows ?? []) as IntakeLink[]);
+    setTenants([...tenantRows].sort((a, b) => a.fullName.localeCompare(b.fullName)));
+    setInvites(inviteRows);
   }, []);
 
   useFocusEffect(
@@ -52,24 +52,24 @@ export default function TenantsScreen() {
   }
 
   async function createInvite() {
-    if (!session) return;
+    if (!user) return;
     setIsInviting(true);
-    const { data, error } = await supabase
-      .from("intake_links")
-      .insert({ owner_id: session.user.id })
-      .select("id")
-      .single();
-    setIsInviting(false);
-    if (error) {
-      Alert.alert("Could not create invite", error.message);
-      return;
+    try {
+      const invite = await api.post<IntakeLink>("/intake-links", {});
+      await load();
+      await shareInvite(`${SITE_URL}/join/${invite.id}`);
+    } catch (err) {
+      Alert.alert(
+        "Could not create invite",
+        err instanceof ApiError ? err.code.replace(/_/g, " ") : "Something went wrong."
+      );
+    } finally {
+      setIsInviting(false);
     }
-    await load();
-    await shareInvite(`${SITE_URL}/join/${data.id}`);
   }
 
   const pendingInvites = invites.filter(
-    (i) => i.status === "pending" && new Date(i.expires_at) > new Date()
+    (i) => i.status === "pending" && new Date(i.expiresAt) > new Date()
   );
 
   return (
@@ -91,7 +91,7 @@ export default function TenantsScreen() {
           {pendingInvites.map((invite) => (
             <View key={invite.id} style={styles.inviteRow}>
               <Text style={styles.inviteText}>
-                Created {new Date(invite.created_at).toLocaleDateString()}
+                Created {new Date(invite.createdAt).toLocaleDateString()}
               </Text>
               <Pressable onPress={() => shareInvite(`${SITE_URL}/join/${invite.id}`)}>
                 <Text style={styles.link}>Share again</Text>
@@ -113,10 +113,10 @@ export default function TenantsScreen() {
             onPress={() => router.push(`/tenant-detail/${tenant.id}`)}
           >
             <View style={styles.cardHeader}>
-              <Text style={styles.name}>{tenant.full_name}</Text>
-              {tenant.kyc_status === "verified" ? (
+              <Text style={styles.name}>{tenant.fullName}</Text>
+              {tenant.kycStatus === "verified" ? (
                 <Text style={styles.badgeVerified}>Verified ✓</Text>
-              ) : tenant.tenant_user_id ? (
+              ) : tenant.tenantUserId ? (
                 <Text style={styles.badgeLinked}>Profile linked</Text>
               ) : (
                 <Text style={styles.badgeManual}>Manual</Text>

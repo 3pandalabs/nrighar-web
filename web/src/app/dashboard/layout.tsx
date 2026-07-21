@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { apiGetCurrentUser } from "@/lib/api/client";
 import { signOut } from "./actions";
 
 const NAV_ITEMS = [
@@ -13,10 +13,7 @@ const NAV_ITEMS = [
 ];
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await apiGetCurrentUser();
 
   if (!user) {
     redirect("/login");
