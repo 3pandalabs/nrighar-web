@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "Overview" },
   { href: "/dashboard/properties", label: "Properties" },
   { href: "/dashboard/tenants", label: "Tenants" },
+  { href: "/dashboard/listings", label: "Marketplace" },
   { href: "/dashboard/rent", label: "Rent" },
   { href: "/dashboard/documents", label: "Documents" },
   { href: "/dashboard/settings", label: "Settings" },

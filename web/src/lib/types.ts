@@ -118,6 +118,66 @@ export type IntakeLink = {
   expiresAt: string;
 };
 
+export type PropertyListing = {
+  id: string;
+  ownerId: string;
+  propertyId: string;
+  baseRentAsk: number;
+  status: "open" | "closed";
+  createdAt: string;
+  closedAt: string | null;
+};
+
+export type PublicListing = {
+  id: string;
+  baseRentAsk: number;
+  createdAt: string;
+  title: string;
+  city: string;
+  state: string;
+  propertyType: Property["propertyType"];
+};
+
+export type PropertyApplication = {
+  id: string;
+  listingId: string;
+  ownerId: string;
+  applicantUserId: string;
+  proposedRent: number;
+  moveInDate: string;
+  monthlyIncome: number | null;
+  profileHighlights: string | null;
+  status: "under_review" | "kyc_requested" | "approved" | "rejected" | "withdrawn";
+  intakeLinkId: string | null;
+  createdAt: string;
+  rentVariancePct: number;
+};
+
+export type OwnApplication = PropertyApplication & {
+  propertyNickname: string;
+  propertyCity: string;
+};
+
+export type ListingApplicant = PropertyApplication & {
+  incomeToRentRatio: number | null;
+  creditScoreRange: null;
+  applicantFullName: string | null;
+  applicantCurrentCity: string | null;
+  applicantEmployer: string | null;
+  applicantKycStatus: TenantProfile["kycStatus"] | null;
+};
+
+export type ListingApplicationsResponse = {
+  listing: PropertyListing;
+  marketSignals: {
+    offerVolume: number;
+    highestProposedRent: number | null;
+    averageProposedRent: number | null;
+    earliestMoveInDate: string | null;
+  };
+  applicants: ListingApplicant[];
+};
+
 export type DocumentRow = {
   id: string;
   ownerId: string;

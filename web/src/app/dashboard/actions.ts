@@ -248,3 +248,48 @@ export async function getDownloadUrl(key: string): Promise<string | null> {
     return null;
   }
 }
+
+export async function openListing(formData: FormData) {
+  await requireUser();
+
+  await apiFetch("/listings", {
+    method: "POST",
+    body: JSON.stringify({
+      propertyId: String(formData.get("property_id") ?? ""),
+      baseRentAsk: Number(formData.get("base_rent_ask") ?? 0),
+    }),
+  });
+
+  revalidatePath("/dashboard/listings");
+}
+
+export async function closeListing(formData: FormData) {
+  await requireUser();
+
+  const id = String(formData.get("id") ?? "");
+  await apiFetch(`/listings/${id}`, { method: "PATCH", body: JSON.stringify({ status: "closed" }) });
+
+  revalidatePath("/dashboard/listings");
+  revalidatePath(`/dashboard/listings/${id}`);
+}
+
+export async function requestApplicationKyc(formData: FormData) {
+  await requireUser();
+
+  const applicationId = String(formData.get("application_id") ?? "");
+  const listingId = String(formData.get("listing_id") ?? "");
+  await apiFetch(`/applications/${applicationId}/request-kyc`, { method: "POST" });
+
+  revalidatePath(`/dashboard/listings/${listingId}`);
+}
+
+export async function decideApplication(formData: FormData) {
+  await requireUser();
+
+  const applicationId = String(formData.get("application_id") ?? "");
+  const listingId = String(formData.get("listing_id") ?? "");
+  const status = String(formData.get("status") ?? "");
+  await apiFetch(`/applications/${applicationId}`, { method: "PATCH", body: JSON.stringify({ status }) });
+
+  revalidatePath(`/dashboard/listings/${listingId}`);
+}
