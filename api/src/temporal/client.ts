@@ -10,6 +10,14 @@ export function getTemporalClient(): Promise<Client> {
     clientPromise = Connection.connect({ address: temporalEnv.address }).then(
       (connection) => new Client({ connection, namespace: temporalEnv.namespace }),
     );
+    // Don't cache a *failed* connection: a rejected promise stored here makes
+    // every later request reuse the same rejection, so a transient blip (or a
+    // stale TEMPORAL_ADDRESS at boot) turns into a permanent instant-500 until
+    // the process is restarted. Clearing it on failure lets the next request
+    // reconnect. The success path keeps the singleton.
+    clientPromise.catch(() => {
+      clientPromise = undefined;
+    });
   }
   return clientPromise;
 }
