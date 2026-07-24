@@ -1,9 +1,11 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   date,
   index,
   integer,
+  jsonb,
   numeric,
   pgTable,
   text,
@@ -389,6 +391,52 @@ export const tenantDocuments = pgTable(
     check(
       "tenant_documents_type_check",
       sql`${t.docType} in ('agreement','kyc','property_paper','tax','other')`,
+    ),
+  ],
+);
+
+// One row per automated KYC extraction/verification run against a document
+// or tenant_document row. documentSource + documentId point at whichever of
+// those two tables the file's metadata row lives in (they're separate
+// tables, so this can't be a normal FK). extractedFields never contains a
+// raw Aadhaar number — that's masked to its last 4 digits before this row
+// is ever written (see lib/kyc/mask.ts) — so this table is safe to read back
+// over the API without extra redaction.
+export const kycVerifications = pgTable(
+  "kyc_verifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    documentSource: text("document_source").notNull(),
+    documentId: uuid("document_id").notNull(),
+    ownerId: uuid("owner_id").references(() => users.id, { onDelete: "cascade" }),
+    tenantId: uuid("tenant_id").references(() => tenants.id, { onDelete: "cascade" }),
+    tenantUserId: uuid("tenant_user_id").references(() => users.id, { onDelete: "cascade" }),
+    docType: text("doc_type"),
+    status: text("status").notNull().default("pending"),
+    isValidDocument: boolean("is_valid_document"),
+    extractedFields: jsonb("extracted_fields"),
+    qualityFlags: jsonb("quality_flags"),
+    officialCheckStatus: text("official_check_status"),
+    officialCheckDetail: jsonb("official_check_detail"),
+    errorMessage: text("error_message"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_kyc_verifications_document").on(t.documentSource, t.documentId),
+    index("idx_kyc_verifications_tenant").on(t.tenantId),
+    index("idx_kyc_verifications_tenant_user").on(t.tenantUserId),
+    check("kyc_verifications_source_check", sql`${t.documentSource} in ('document','tenant_document')`),
+    check(
+      "kyc_verifications_status_check",
+      sql`${t.status} in ('pending','extracted','verified','manual_review','rejected','failed')`,
+    ),
+    check(
+      "kyc_verifications_doc_type_check",
+      sql`${t.docType} is null or ${t.docType} in ('pan_card','aadhaar_card','passport','unknown')`,
+    ),
+    check(
+      "kyc_verifications_official_check_status_check",
+      sql`${t.officialCheckStatus} is null or ${t.officialCheckStatus} in ('verified','mismatch','not_configured','error')`,
     ),
   ],
 );

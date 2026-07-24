@@ -3,13 +3,16 @@ import { z } from "zod";
 import { requireAuth, requireTenantRole } from "../auth/plugin.js";
 import { sendWorkflow } from "../temporal/runWorkflow.js";
 
+// kycStatus is deliberately not tenant-settable here — it's promoted to
+// 'verified' only by kycVerificationWorkflow (see temporal/workflows/kyc.ts),
+// never by self-attestation. Owners can still set it manually on their own
+// tenants record via PATCH /tenants/:id.
 const patchBody = z.object({
   fullName: z.string().min(1).optional(),
   phone: z.string().optional(),
   email: z.string().email().optional(),
   currentCity: z.string().optional(),
   employer: z.string().optional(),
-  kycStatus: z.enum(["pending", "submitted", "verified"]).optional(),
 });
 
 const docBody = z.object({
@@ -56,4 +59,15 @@ export async function tenantProfileRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     return sendWorkflow(reply, "deleteTenantDocumentWorkflow", [{ id, userId: req.userId! }], 204);
   });
+
+  app.get(
+    "/tenant-documents/:id/kyc-verification",
+    { preHandler: [requireAuth, requireTenantRole] },
+    async (req, reply) => {
+      const { id } = req.params as { id: string };
+      return sendWorkflow(reply, "getTenantDocumentKycVerificationWorkflow", [
+        { documentId: id, userId: req.userId! },
+      ]);
+    },
+  );
 }

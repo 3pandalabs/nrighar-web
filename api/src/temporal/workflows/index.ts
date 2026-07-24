@@ -15,3 +15,4 @@ export * from "./auth.js";
 export * from "./tenantIntake.js";
 export * from "./listings.js";
 export * from "./applications.js";
+export * from "./kyc.js";

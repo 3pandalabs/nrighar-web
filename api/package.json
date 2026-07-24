@@ -16,6 +16,7 @@
     "temporal:ping": "tsx src/temporal/triggerPing.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.114.0",
     "@aws-sdk/client-s3": "^3.687.0",
     "@aws-sdk/s3-request-presigner": "^3.687.0",
     "@fastify/cors": "^10.0.1",

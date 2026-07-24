@@ -32,4 +32,11 @@ export async function documentRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     return sendWorkflow(reply, "deleteDocumentWorkflow", [{ id, ownerId: req.userId! }], 204);
   });
+
+  // null while extraction/verification hasn't finished (or hasn't started —
+  // it's kicked off async right after POST /documents, not before it).
+  app.get("/documents/:id/kyc-verification", { preHandler: requireAuth }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    return sendWorkflow(reply, "getDocumentKycVerificationWorkflow", [{ documentId: id, ownerId: req.userId! }]);
+  });
 }

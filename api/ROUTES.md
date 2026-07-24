@@ -39,14 +39,16 @@ Standard REST, all `requireAuth`, all implicitly scoped to the caller as owner. 
   body: `{ leaseId, periodYear, periodMonth, amountDue, amountPaid?, paidOn?, method?, status?, notes? }`
 - `GET|POST /documents`, `DELETE /documents/:id`
   body: `{ propertyId?, leaseId?, docType?, title, storagePath }` — `storagePath` must be a key you already have upload rights to (see Storage below).
+- `GET /documents/:id/kyc-verification` — latest automated KYC extraction/verification result for a `docType: 'kyc'` document (`null` until the async check finishes). See KYC verification below.
 
 ## Tenant self (role must be `tenant`)
 
 | Method | Path | Body |
 |---|---|---|
-| GET/PATCH | `/tenant-profile` | `{ fullName?, phone?, email?, currentCity?, employer?, kycStatus? }` |
+| GET/PATCH | `/tenant-profile` | `{ fullName?, phone?, email?, currentCity?, employer? }` — `kycStatus` is **not** settable here; see KYC verification below |
 | GET/POST | `/tenant-documents` | `{ docType?, title, storagePath }` |
 | DELETE | `/tenant-documents/:id` | — |
+| GET | `/tenant-documents/:id/kyc-verification` | latest automated KYC result, `null` until it finishes |
 
 ## Cross-owner shared reads (requires a claimed `profile_shares`)
 
@@ -107,6 +109,18 @@ An owner opens a **listing** on one of their properties to invite competing tena
 | GET/POST | `/applications/:id/messages` | owner or applicant | `{ body }` (post only) | async message thread on one application — not real-time, messages appear on next fetch. Either participant (the listing's owner or the application's `applicantUserId`) can read/post; anyone else 404s. Row shape: `{ id, applicationId, senderUserId, senderRole: 'owner'\|'tenant', body, createdAt }` |
 
 **Fair Housing note**: nothing in this schema captures protected-class data (race, gender, religion, familial status) — the comparison view's ordering and every derived signal (`rentVariancePct`, `incomeToRentRatio`, move-in alignment, KYC status) is strictly financial/timeline/verification. `applicantFullName`/`applicantCurrentCity`/`applicantEmployer` are display-only and never feed sorting or filtering.
+
+## KYC verification (automated, async)
+
+Any `docType: 'kyc'` document created via `POST /documents`, `POST /tenant-documents`, or `POST /tenant-intake/:token` triggers a Temporal child workflow (`kycVerificationWorkflow`) that reads the file, extracts PAN/Aadhaar/passport fields with a vision-capable Claude model, and writes one `kyc_verifications` row. It runs *after* the create request already returned, so poll the `kyc-verification` GET route rather than expecting a result inline.
+
+`kyc_verifications.status`: `manual_review` (needs a human look — quality issue, missing field, or no official-provider check configured yet), `rejected` (not a recognizable PAN/Aadhaar/passport), `verified` (extraction clean AND an official provider check passed — currently unreachable, see below), `failed` (extraction itself errored, e.g. `ANTHROPIC_API_KEY` unset on the worker).
+
+Aadhaar numbers are masked to `XXXX-XXXX-<last 4 digits>` before the row is ever written — the full 12-digit number never reaches this table or any API response.
+
+`verified` only ever gets set automatically by this pipeline, never by a tenant PATCHing their own `kycStatus` — that field was removed from `PATCH /tenant-profile`'s accepted body for this reason. Owners can still manually set a tenant's `kycStatus` via `PATCH /tenants/:id`.
+
+Official government/aggregator verification (NSDL/Protean for PAN, a licensed AUA/KUA or aggregator for Aadhaar, Passport Seva for passports) is stubbed out (`src/lib/kyc/officialVerify.ts`, all return `not_configured`) pending real provider credentials — until then, every successfully-extracted document lands in `manual_review`, not `verified`.
 
 ## Storage (Cloudflare R2)
 
