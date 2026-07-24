@@ -4,7 +4,13 @@ import { formatInr } from "@/lib/currency";
 import type { Property, PropertyListing } from "@/lib/types";
 import { openListing } from "../actions";
 
-export default async function ListingsPage() {
+export default async function ListingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ propertyId?: string }>;
+}) {
+  const { propertyId: requestedPropertyId } = await searchParams;
+
   const [listings, properties] = await Promise.all([
     apiFetch("/listings") as Promise<PropertyListing[]>,
     apiFetch("/properties") as Promise<Property[]>,
@@ -13,6 +19,10 @@ export default async function ListingsPage() {
   const propertyById = new Map((properties ?? []).map((p) => [p.id, p]));
   const openPropertyIds = new Set((listings ?? []).filter((l) => l.status === "open").map((l) => l.propertyId));
   const availableProperties = (properties ?? []).filter((p) => !openPropertyIds.has(p.id));
+  const preselectedPropertyId =
+    requestedPropertyId && availableProperties.some((p) => p.id === requestedPropertyId)
+      ? requestedPropertyId
+      : undefined;
 
   return (
     <div className="flex flex-col gap-8">
@@ -65,6 +75,7 @@ export default async function ListingsPage() {
               <select
                 name="property_id"
                 required
+                defaultValue={preselectedPropertyId}
                 className="rounded-lg border border-zinc-300 px-3 py-2 text-sm font-normal dark:border-zinc-700 dark:bg-zinc-900"
               >
                 {availableProperties.map((p) => (

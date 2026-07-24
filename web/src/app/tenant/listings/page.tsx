@@ -20,6 +20,8 @@ const PROPERTY_TYPE_LABELS: Record<PublicListing["propertyType"], string> = {
 };
 
 type Filters = {
+  state?: string;
+  city?: string;
   pincode?: string;
   bedrooms?: string;
   min_rent?: string;
@@ -31,6 +33,8 @@ export default async function TenantListingsPage({ searchParams }: { searchParam
   const filters = await searchParams;
 
   const query = new URLSearchParams();
+  if (filters.state) query.set("state", filters.state.trim());
+  if (filters.city) query.set("city", filters.city.trim());
   if (filters.pincode) query.set("pincode", filters.pincode.trim());
   if (filters.bedrooms) query.set("bedrooms", filters.bedrooms);
   if (filters.min_rent) query.set("minRent", filters.min_rent);
@@ -60,12 +64,30 @@ export default async function TenantListingsPage({ searchParams }: { searchParam
         className="flex flex-wrap items-end gap-3 rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950"
       >
         <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          State
+          <input
+            name="state"
+            defaultValue={filters.state ?? ""}
+            placeholder="e.g. Karnataka"
+            className="w-32 rounded-lg border border-zinc-300 px-3 py-2 text-sm font-normal dark:border-zinc-700 dark:bg-zinc-900"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+          City
+          <input
+            name="city"
+            defaultValue={filters.city ?? ""}
+            placeholder="e.g. Bengaluru"
+            className="w-32 rounded-lg border border-zinc-300 px-3 py-2 text-sm font-normal dark:border-zinc-700 dark:bg-zinc-900"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
           PIN code
           <input
             name="pincode"
             defaultValue={filters.pincode ?? ""}
             placeholder="e.g. 560095"
-            className="w-32 rounded-lg border border-zinc-300 px-3 py-2 text-sm font-normal dark:border-zinc-700 dark:bg-zinc-900"
+            className="w-28 rounded-lg border border-zinc-300 px-3 py-2 text-sm font-normal dark:border-zinc-700 dark:bg-zinc-900"
           />
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">

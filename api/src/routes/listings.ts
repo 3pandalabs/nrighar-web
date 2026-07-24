@@ -32,15 +32,19 @@ export async function listingRoutes(app: FastifyInstance) {
     return sendWorkflow(reply, "closeListingWorkflow", [{ id, ownerId: req.userId! }]);
   });
 
-  // Every filter is optional and additive (AND'd together) — pincode is an
+  // Every filter is optional and additive (AND'd together). pincode is an
   // exact match (Indian PIN codes are precise area identifiers, a prefix
-  // match would be a different, fuzzier feature), bedrooms is exact,
-  // minRent/maxRent bound baseRentAsk, minLeaseMonths matches listings
-  // whose own minLeaseMonths is <= the tenant's requested value (a tenant
-  // willing to commit to 12 months should still see a listing asking for
-  // only 6).
+  // match would be a different, fuzzier feature); state/city are
+  // case-insensitive exact matches (free-text fields owners typed in, so
+  // "Bengaluru" vs "bengaluru" shouldn't matter — still not a substring
+  // search); bedrooms is exact; minRent/maxRent bound baseRentAsk;
+  // minLeaseMonths matches listings whose own minLeaseMonths is <= the
+  // tenant's requested value (a tenant willing to commit to 12 months
+  // should still see a listing asking for only 6).
   app.get("/listings/browse", { preHandler: [requireAuth, requireTenantRole] }, async (req, reply) => {
-    const { pincode, bedrooms, minRent, maxRent, minLeaseMonths } = req.query as {
+    const { state, city, pincode, bedrooms, minRent, maxRent, minLeaseMonths } = req.query as {
+      state?: string;
+      city?: string;
       pincode?: string;
       bedrooms?: string;
       minRent?: string;
@@ -49,6 +53,8 @@ export async function listingRoutes(app: FastifyInstance) {
     };
     return sendWorkflow(reply, "browseOpenListingsWorkflow", [
       {
+        state: state || undefined,
+        city: city || undefined,
         pincode: pincode || undefined,
         bedrooms: bedrooms ? Number(bedrooms) : undefined,
         minRent: minRent ? Number(minRent) : undefined,

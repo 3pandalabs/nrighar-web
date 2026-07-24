@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, isNull, lte, or } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, isNull, lte, or } from "drizzle-orm";
 import { ApplicationFailure } from "@temporalio/common";
 import { db, schema } from "../../db/index.js";
 import { isUniqueViolation } from "../../lib/isUniqueViolation.js";
@@ -46,6 +46,8 @@ export async function listOwnListings(input: { ownerId: string }) {
 // unit's address before applying. Every filter is optional and AND'd
 // together — see routes/listings.ts for the exact semantics of each.
 export async function browseOpenListings(input: {
+  state?: string;
+  city?: string;
   pincode?: string;
   bedrooms?: number;
   minRent?: number;
@@ -70,6 +72,8 @@ export async function browseOpenListings(input: {
     .where(
       and(
         eq(schema.propertyListings.status, "open"),
+        input.state ? ilike(schema.properties.state, input.state) : undefined,
+        input.city ? ilike(schema.properties.city, input.city) : undefined,
         input.pincode ? eq(schema.properties.pincode, input.pincode) : undefined,
         input.bedrooms !== undefined ? eq(schema.properties.bedrooms, input.bedrooms) : undefined,
         input.minRent !== undefined ? gte(schema.propertyListings.baseRentAsk, String(input.minRent)) : undefined,

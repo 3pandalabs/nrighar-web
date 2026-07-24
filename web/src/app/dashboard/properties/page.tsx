@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { apiFetch } from "@/lib/api/client";
-import type { Lease, Property, Tenant } from "@/lib/types";
+import type { Lease, Property, PropertyListing, Tenant } from "@/lib/types";
 import { addProperty } from "../actions";
 
 const PROPERTY_TYPES = [
@@ -12,15 +12,19 @@ const PROPERTY_TYPES = [
 ] as const;
 
 export default async function PropertiesPage() {
-  const [properties, allLeases, tenants] = await Promise.all([
+  const [properties, allLeases, tenants, allListings] = await Promise.all([
     apiFetch("/properties") as Promise<Property[]>,
     apiFetch("/leases") as Promise<Lease[]>,
     apiFetch("/tenants") as Promise<Tenant[]>,
+    apiFetch("/listings") as Promise<PropertyListing[]>,
   ]);
 
   const leases = (allLeases ?? []).filter((l) => l.status === "active");
   const tenantById = new Map((tenants ?? []).map((t) => [t.id, t]));
   const activeLeaseByProperty = new Map(leases.map((l) => [l.propertyId, l]));
+  const listedPropertyIds = new Set(
+    (allListings ?? []).filter((l) => l.status === "open").map((l) => l.propertyId),
+  );
 
   return (
     <div className="flex flex-col gap-8">
@@ -58,6 +62,9 @@ export default async function PropertiesPage() {
                       <span className="text-zinc-500">Vacant</span>
                     )}
                   </p>
+                  {!listedPropertyIds.has(property.id) && (
+                    <p className="mt-1 text-xs text-amber-600 dark:text-amber-500">Not listed on marketplace</p>
+                  )}
                 </Link>
               </li>
             );
