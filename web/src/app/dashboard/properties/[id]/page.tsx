@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { apiFetch, ApiError } from "@/lib/api/client";
 import { formatInr } from "@/lib/currency";
-import type { Lease, Property, RentPayment, Tenant } from "@/lib/types";
+import type { Lease, Property, PropertyListing, RentPayment, Tenant } from "@/lib/types";
 import { addLease, endLease } from "../../actions";
 
 export default async function PropertyDetailPage({
@@ -20,11 +20,14 @@ export default async function PropertyDetailPage({
     throw e;
   }
 
-  const [tenants, allLeases, allPayments] = await Promise.all([
+  const [tenants, allLeases, allPayments, allListings] = await Promise.all([
     apiFetch("/tenants") as Promise<Tenant[]>,
     apiFetch("/leases") as Promise<Lease[]>,
     apiFetch("/rent-payments") as Promise<RentPayment[]>,
+    apiFetch("/listings") as Promise<PropertyListing[]>,
   ]);
+
+  const openListing = (allListings ?? []).find((l) => l.propertyId === id && l.status === "open");
 
   const leases = (allLeases ?? [])
     .filter((l) => l.propertyId === id)
@@ -63,6 +66,27 @@ export default async function PropertyDetailPage({
         </p>
         {property.notes && <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{property.notes}</p>}
       </div>
+
+      {openListing ? (
+        <div className="flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm dark:border-emerald-900 dark:bg-emerald-950">
+          <span className="text-emerald-800 dark:text-emerald-300">
+            Listed on the marketplace at {formatInr(Number(openListing.baseRentAsk))} / month — tenants can find and
+            apply to it.
+          </span>
+          <Link href={`/dashboard/listings/${openListing.id}`} className="shrink-0 font-medium underline">
+            View applications
+          </Link>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm dark:border-amber-900 dark:bg-amber-950">
+          <span className="text-amber-800 dark:text-amber-300">
+            Not listed on the marketplace yet — tenants can&apos;t find or apply to it until you open a listing.
+          </span>
+          <Link href={`/dashboard/listings?propertyId=${property.id}`} className="shrink-0 font-medium underline">
+            Open a listing
+          </Link>
+        </div>
+      )}
 
       <section className="rounded-2xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-950">
         <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">Current lease</h2>

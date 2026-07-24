@@ -10,6 +10,7 @@ type PropertyBody = {
   state: string;
   pincode: string;
   propertyType?: "apartment" | "independent_house" | "villa" | "plot" | "commercial";
+  bedrooms?: number;
   notes?: string;
 };
 

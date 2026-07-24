@@ -13,6 +13,7 @@ const propertyBody = z.object({
   propertyType: z
     .enum(["apartment", "independent_house", "villa", "plot", "commercial"])
     .default("apartment"),
+  bedrooms: z.number().int().positive().optional(),
   notes: z.string().optional(),
 });
 

@@ -63,6 +63,7 @@ export type Property = {
   state: string;
   pincode: string;
   propertyType: "apartment" | "independent_house" | "villa" | "plot" | "commercial";
+  bedrooms: number | null;
   notes: string | null;
   createdAt: string;
 };
@@ -116,6 +117,79 @@ export type IntakeLink = {
   createdAt: string;
   submittedAt: string | null;
   expiresAt: string;
+};
+
+export type PropertyListing = {
+  id: string;
+  ownerId: string;
+  propertyId: string;
+  baseRentAsk: number;
+  minLeaseMonths: number | null;
+  status: "open" | "closed";
+  createdAt: string;
+  closedAt: string | null;
+};
+
+export type PublicListing = {
+  id: string;
+  baseRentAsk: number;
+  minLeaseMonths: number | null;
+  createdAt: string;
+  title: string;
+  city: string;
+  state: string;
+  pincode: string;
+  propertyType: Property["propertyType"];
+  bedrooms: number | null;
+};
+
+export type PropertyApplication = {
+  id: string;
+  listingId: string;
+  ownerId: string;
+  applicantUserId: string;
+  proposedRent: number;
+  moveInDate: string;
+  monthlyIncome: number | null;
+  profileHighlights: string | null;
+  status: "under_review" | "kyc_requested" | "approved" | "rejected" | "withdrawn";
+  intakeLinkId: string | null;
+  createdAt: string;
+  rentVariancePct: number;
+};
+
+export type ApplicationMessage = {
+  id: string;
+  applicationId: string;
+  senderUserId: string;
+  senderRole: "owner" | "tenant";
+  body: string;
+  createdAt: string;
+};
+
+export type OwnApplication = PropertyApplication & {
+  propertyNickname: string;
+  propertyCity: string;
+};
+
+export type ListingApplicant = PropertyApplication & {
+  incomeToRentRatio: number | null;
+  creditScoreRange: null;
+  applicantFullName: string | null;
+  applicantCurrentCity: string | null;
+  applicantEmployer: string | null;
+  applicantKycStatus: TenantProfile["kycStatus"] | null;
+};
+
+export type ListingApplicationsResponse = {
+  listing: PropertyListing;
+  marketSignals: {
+    offerVolume: number;
+    highestProposedRent: number | null;
+    averageProposedRent: number | null;
+    earliestMoveInDate: string | null;
+  };
+  applicants: ListingApplicant[];
 };
 
 export type DocumentRow = {

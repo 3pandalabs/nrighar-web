@@ -8,6 +8,27 @@
       "when": 1784565607223,
       "tag": "0000_abnormal_mystique",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784906623338,
+      "tag": "0001_rich_risque",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784908678234,
+      "tag": "0002_damp_piledriver",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1784910903439,
+      "tag": "0003_uneven_tigra",
+      "breakpoints": true
     }
   ]
 }
