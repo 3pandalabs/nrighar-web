@@ -31,6 +31,7 @@ export async function addProperty(formData: FormData) {
       state: String(formData.get("state") ?? "").trim(),
       pincode: String(formData.get("pincode") ?? "").trim(),
       propertyType: String(formData.get("property_type") ?? "apartment"),
+      bedrooms: formData.get("bedrooms") ? Number(formData.get("bedrooms")) : undefined,
       notes: String(formData.get("notes") ?? "").trim() || undefined,
     }),
   });
@@ -257,6 +258,7 @@ export async function openListing(formData: FormData) {
     body: JSON.stringify({
       propertyId: String(formData.get("property_id") ?? ""),
       baseRentAsk: Number(formData.get("base_rent_ask") ?? 0),
+      minLeaseMonths: formData.get("min_lease_months") ? Number(formData.get("min_lease_months")) : undefined,
     }),
   });
 

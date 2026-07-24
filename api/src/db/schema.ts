@@ -70,6 +70,10 @@ export const properties = pgTable(
     state: text("state").notNull(),
     pincode: text("pincode").notNull(),
     propertyType: text("property_type").notNull().default("apartment"),
+    // Bedroom count ("BHK" in Indian rental listings) — nullable since
+    // properties created before this column existed don't have one; the
+    // marketplace browse filter treats a null as "unspecified", not "0".
+    bedrooms: integer("bedrooms"),
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -79,6 +83,7 @@ export const properties = pgTable(
       "properties_type_check",
       sql`${t.propertyType} in ('apartment','independent_house','villa','plot','commercial')`,
     ),
+    check("properties_bedrooms_check", sql`${t.bedrooms} is null or ${t.bedrooms} > 0`),
   ],
 );
 
@@ -155,6 +160,10 @@ export const propertyListings = pgTable(
       .notNull()
       .references(() => properties.id, { onDelete: "cascade" }),
     baseRentAsk: numeric("base_rent_ask", { precision: 12, scale: 2 }).notNull(),
+    // Desired minimum lease length in months, set when the listing is
+    // opened — separate from leases.startDate/endDate, which only exist
+    // once an actual lease is created post-approval.
+    minLeaseMonths: integer("min_lease_months"),
     status: text("status").notNull().default("open"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     closedAt: timestamp("closed_at", { withTimezone: true }),
@@ -167,6 +176,7 @@ export const propertyListings = pgTable(
       .where(sql`${t.status} = 'open'`),
     check("property_listings_status_check", sql`${t.status} in ('open','closed')`),
     check("property_listings_base_rent_check", sql`${t.baseRentAsk} > 0`),
+    check("property_listings_min_lease_check", sql`${t.minLeaseMonths} is null or ${t.minLeaseMonths} > 0`),
   ],
 );
 

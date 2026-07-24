@@ -30,7 +30,7 @@ All error responses: `{ "error": "<code>" }` with a matching HTTP status. A reso
 Standard REST, all `requireAuth`, all implicitly scoped to the caller as owner. A property/tenant/lease/document belonging to another owner 404s.
 
 - `GET|POST /properties`, `GET|PATCH|DELETE /properties/:id`
-  body: `{ nickname, addressLine1, addressLine2?, city, state, pincode, propertyType?: 'apartment'|'independent_house'|'villa'|'plot'|'commercial', notes? }`
+  body: `{ nickname, addressLine1, addressLine2?, city, state, pincode, propertyType?: 'apartment'|'independent_house'|'villa'|'plot'|'commercial', bedrooms? (BHK count), notes? }`
 - `GET|POST /tenants`, `GET|PATCH|DELETE /tenants/:id`
   body: `{ fullName, phone?, email?, kycStatus?: 'pending'|'submitted'|'verified', notes? }`
 - `GET|POST /leases`, `GET|PATCH|DELETE /leases/:id`
@@ -96,9 +96,9 @@ An owner opens a **listing** on one of their properties to invite competing tena
 
 | Method | Path | Auth | Body | Notes |
 |---|---|---|---|---|
-| GET/POST | `/listings` | owner | `{ propertyId, baseRentAsk }` | list/open your own listings |
+| GET/POST | `/listings` | owner | `{ propertyId, baseRentAsk, minLeaseMonths? }` | list/open your own listings |
 | PATCH | `/listings/:id` | owner | — | closes the listing (`status: 'closed'`) |
-| GET | `/listings/browse` | tenant | — | public-safe fields only: `{ id, title, city, state, propertyType, baseRentAsk, createdAt }` — no address/owner details |
+| GET | `/listings/browse` | tenant | — | public-safe fields: `{ id, title, city, state, pincode, propertyType, bedrooms, baseRentAsk, minLeaseMonths, createdAt }` — no address line/owner details. Optional query filters, all AND'd together: `?pincode=` (exact match), `?bedrooms=` (exact match), `?minRent=`/`?maxRent=` (bound `baseRentAsk`), `?minLeaseMonths=` (matches listings whose own minimum is `<=` this, or unset) |
 | POST | `/listings/:id/applications` | tenant | `{ proposedRent, moveInDate, monthlyIncome?, profileHighlights? }` | `submit_property_application` — `rentVariancePct` is always computed server-side from the listing's `baseRentAsk`, never trusted from the client. One active (`under_review`/`kyc_requested`) application per applicant per listing — re-applying after rejection/withdrawal is fine, stacking offers isn't (`409`). |
 | GET | `/applications` | tenant | — | your own applications across every listing, for status tracking |
 | GET | `/listings/:id/applications` | owner | — | `get_property_applications` — side-by-side comparison ordered by `proposedRent` desc, plus `marketSignals: { offerVolume, highestProposedRent, averageProposedRent, earliestMoveInDate }`. Each applicant row includes `rentVariancePct`, `incomeToRentRatio` (null if `monthlyIncome` wasn't given), `creditScoreRange` (always `null` — no credit-bureau integration exists), and display fields from `tenant_profiles` (`applicantFullName`, `applicantCurrentCity`, `applicantEmployer`, `applicantKycStatus`). |

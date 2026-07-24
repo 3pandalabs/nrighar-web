@@ -42,6 +42,7 @@ export default async function PropertiesPage() {
                       {property.nickname}
                     </h2>
                     <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs capitalize text-zinc-600 dark:bg-zinc-900 dark:text-zinc-400">
+                      {property.bedrooms ? `${property.bedrooms}BHK · ` : ""}
                       {property.propertyType.replace("_", " ")}
                     </span>
                   </div>
@@ -88,6 +89,16 @@ export default async function PropertiesPage() {
           <Field name="city" label="City" required />
           <Field name="state" label="State" required />
           <Field name="pincode" label="PIN code" required />
+          <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            Bedrooms (BHK)
+            <input
+              name="bedrooms"
+              type="number"
+              min="1"
+              step="1"
+              className="rounded-lg border border-zinc-300 px-3 py-2 text-sm font-normal dark:border-zinc-700 dark:bg-zinc-900"
+            />
+          </label>
           <Field name="notes" label="Notes" />
           <div className="sm:col-span-2">
             <button

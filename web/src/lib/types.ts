@@ -63,6 +63,7 @@ export type Property = {
   state: string;
   pincode: string;
   propertyType: "apartment" | "independent_house" | "villa" | "plot" | "commercial";
+  bedrooms: number | null;
   notes: string | null;
   createdAt: string;
 };
@@ -123,6 +124,7 @@ export type PropertyListing = {
   ownerId: string;
   propertyId: string;
   baseRentAsk: number;
+  minLeaseMonths: number | null;
   status: "open" | "closed";
   createdAt: string;
   closedAt: string | null;
@@ -131,11 +133,14 @@ export type PropertyListing = {
 export type PublicListing = {
   id: string;
   baseRentAsk: number;
+  minLeaseMonths: number | null;
   createdAt: string;
   title: string;
   city: string;
   state: string;
+  pincode: string;
   propertyType: Property["propertyType"];
+  bedrooms: number | null;
 };
 
 export type PropertyApplication = {

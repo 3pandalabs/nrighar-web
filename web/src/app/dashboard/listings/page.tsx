@@ -85,6 +85,16 @@ export default async function ListingsPage() {
                 className="rounded-lg border border-zinc-300 px-3 py-2 text-sm font-normal dark:border-zinc-700 dark:bg-zinc-900"
               />
             </label>
+            <label className="flex flex-col gap-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              Min. lease (months, optional)
+              <input
+                name="min_lease_months"
+                type="number"
+                min="1"
+                step="1"
+                className="rounded-lg border border-zinc-300 px-3 py-2 text-sm font-normal dark:border-zinc-700 dark:bg-zinc-900"
+              />
+            </label>
             <button
               type="submit"
               className="rounded-full bg-zinc-900 px-6 py-2.5 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-white dark:text-zinc-900"

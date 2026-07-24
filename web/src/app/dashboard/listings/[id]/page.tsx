@@ -46,7 +46,8 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
             {property?.nickname ?? "Listing"}
           </h1>
           <p className="text-sm text-zinc-500">
-            Asking {formatInr(Number(listing.baseRentAsk))} / month ·{" "}
+            Asking {formatInr(Number(listing.baseRentAsk))} / month
+            {listing.minLeaseMonths ? ` · ${listing.minLeaseMonths}mo min lease` : ""} ·{" "}
             {listing.status === "open" ? (
               <span className="text-emerald-600 dark:text-emerald-500">Open</span>
             ) : (
