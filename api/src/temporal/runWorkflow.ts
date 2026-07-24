@@ -15,8 +15,8 @@ export interface HttpFailure {
 // workflowExecutionTimeout means a dead worker/Temporal server fails the HTTP
 // request fast instead of hanging it indefinitely.
 export async function runWorkflow<T>(workflowType: string, args: unknown[]): Promise<T> {
-  const client = await getTemporalClient();
   try {
+    const client = await getTemporalClient();
     return await client.workflow.execute(workflowType, {
       taskQueue: temporalEnv.taskQueue,
       workflowId: `${workflowType}-${randomUUID()}`,
@@ -24,6 +24,13 @@ export async function runWorkflow<T>(workflowType: string, args: unknown[]): Pro
       args,
     });
   } catch (err) {
+    // getTemporalClient() itself can throw (e.g. a stale TEMPORAL_ADDRESS
+    // failing to connect) — that used to happen outside this try/catch, so
+    // toHttpFailure() never ran and sendWorkflow's `{ status, body } = err`
+    // destructured undefined, crashing on `reply.code(undefined)` instead
+    // of returning a clean 500. Moving the call in here means every
+    // failure path — connection or workflow — goes through the same
+    // fallback-to-500 handling in toHttpFailure().
     throw toHttpFailure(err);
   }
 }
