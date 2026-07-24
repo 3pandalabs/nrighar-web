@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { ApplicationFailure } from "@temporalio/common";
 import { db, schema } from "../../db/index.js";
 import { isUniqueViolation } from "../../lib/isUniqueViolation.js";
@@ -177,5 +177,40 @@ export async function decideApplication(input: {
     )
     .returning();
   if (!row) throw ApplicationFailure.create({ type: "not_found", nonRetryable: true });
+  return row;
+}
+
+// Shared by both message activities below — same "exists but isn't yours"
+// -> 404 (never 403) convention as every other resource in this API. Either
+// side of the application (the owner or the applicant) counts as a
+// participant; nobody else can read or post into the thread.
+async function assertParticipant(applicationId: string, userId: string) {
+  const [application] = await db
+    .select({ ownerId: schema.propertyApplications.ownerId, applicantUserId: schema.propertyApplications.applicantUserId })
+    .from(schema.propertyApplications)
+    .where(eq(schema.propertyApplications.id, applicationId));
+  if (!application) throw ApplicationFailure.create({ type: "not_found", nonRetryable: true });
+  if (application.ownerId !== userId && application.applicantUserId !== userId) {
+    throw ApplicationFailure.create({ type: "not_found", nonRetryable: true });
+  }
+  return application;
+}
+
+export async function listApplicationMessages(input: { applicationId: string; userId: string }) {
+  await assertParticipant(input.applicationId, input.userId);
+  return db
+    .select()
+    .from(schema.applicationMessages)
+    .where(eq(schema.applicationMessages.applicationId, input.applicationId))
+    .orderBy(asc(schema.applicationMessages.createdAt));
+}
+
+export async function sendApplicationMessage(input: { applicationId: string; userId: string; body: string }) {
+  const application = await assertParticipant(input.applicationId, input.userId);
+  const senderRole = application.ownerId === input.userId ? "owner" : "tenant";
+  const [row] = await db
+    .insert(schema.applicationMessages)
+    .values({ applicationId: input.applicationId, senderUserId: input.userId, senderRole, body: input.body })
+    .returning();
   return row;
 }

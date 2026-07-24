@@ -110,3 +110,15 @@ export async function submitListingApplication(formData: FormData) {
 
   revalidatePath("/tenant/listings");
 }
+
+export async function sendApplicationMessage(formData: FormData) {
+  await requireUser();
+
+  const applicationId = String(formData.get("application_id") ?? "");
+  const body = String(formData.get("body") ?? "").trim();
+  if (!body) return;
+
+  await apiFetch(`/applications/${applicationId}/messages`, { method: "POST", body: JSON.stringify({ body }) });
+
+  revalidatePath("/tenant/listings");
+}

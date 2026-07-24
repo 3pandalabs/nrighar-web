@@ -228,6 +228,33 @@ export const propertyApplications = pgTable(
   ],
 );
 
+// Async message thread between an owner and the tenant on one application —
+// deliberately not real-time (no WebSocket/Durable Object infra in this
+// app); messages show up on the next page load, matching every other
+// mutation here. senderRole is denormalized rather than derived from
+// comparing senderUserId to the application's ownerId/applicantUserId at
+// read time — cheaper to query and stays correct even if that ever changes.
+export const applicationMessages = pgTable(
+  "application_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    applicationId: uuid("application_id")
+      .notNull()
+      .references(() => propertyApplications.id, { onDelete: "cascade" }),
+    senderUserId: uuid("sender_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    senderRole: text("sender_role").notNull(),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_application_messages_application").on(t.applicationId),
+    check("application_messages_sender_role_check", sql`${t.senderRole} in ('owner','tenant')`),
+    check("application_messages_body_check", sql`length(${t.body}) > 0`),
+  ],
+);
+
 export const rentPayments = pgTable(
   "rent_payments",
   {

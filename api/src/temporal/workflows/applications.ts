@@ -7,6 +7,8 @@ const {
   getListingApplications,
   requestKycForApplication,
   decideApplication,
+  listApplicationMessages,
+  sendApplicationMessage,
 } = proxyActivities<typeof activities>({
   startToCloseTimeout: "10 seconds",
   retry: { maximumAttempts: 3 },
@@ -22,3 +24,7 @@ export const requestKycForApplicationWorkflow = (input: Parameters<typeof reques
   requestKycForApplication(input);
 export const decideApplicationWorkflow = (input: Parameters<typeof decideApplication>[0]) =>
   decideApplication(input);
+export const listApplicationMessagesWorkflow = (input: Parameters<typeof listApplicationMessages>[0]) =>
+  listApplicationMessages(input);
+export const sendApplicationMessageWorkflow = (input: Parameters<typeof sendApplicationMessage>[0]) =>
+  sendApplicationMessage(input);

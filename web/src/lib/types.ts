@@ -158,6 +158,15 @@ export type PropertyApplication = {
   rentVariancePct: number;
 };
 
+export type ApplicationMessage = {
+  id: string;
+  applicationId: string;
+  senderUserId: string;
+  senderRole: "owner" | "tenant";
+  body: string;
+  createdAt: string;
+};
+
 export type OwnApplication = PropertyApplication & {
   propertyNickname: string;
   propertyCity: string;

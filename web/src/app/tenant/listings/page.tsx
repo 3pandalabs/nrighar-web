@@ -1,7 +1,8 @@
 import { formatInr } from "@/lib/currency";
-import type { OwnApplication, PublicListing } from "@/lib/types";
+import type { ApplicationMessage, OwnApplication, PublicListing } from "@/lib/types";
 import { apiFetch } from "@/lib/api/client";
-import { submitListingApplication } from "../actions";
+import { MessageThread } from "@/components/MessageThread";
+import { sendApplicationMessage, submitListingApplication } from "../actions";
 
 const STATUS_LABELS: Record<OwnApplication["status"], string> = {
   under_review: "Under review",
@@ -53,6 +54,14 @@ export default async function TenantListingsPage({ searchParams }: { searchParam
     (applications ?? [])
       .filter((a) => a.status === "under_review" || a.status === "kyc_requested")
       .map((a) => [a.listingId, a]),
+  );
+
+  const messagesByApplication = new Map(
+    await Promise.all(
+      (applications ?? []).map(
+        async (a) => [a.id, (await apiFetch(`/applications/${a.id}/messages`)) as ApplicationMessage[]] as const,
+      ),
+    ),
   );
 
   return (
@@ -239,28 +248,42 @@ export default async function TenantListingsPage({ searchParams }: { searchParam
       {applications && applications.length > 0 && (
         <section>
           <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-50">My applications</h2>
-          <ul className="divide-y divide-zinc-200 rounded-xl border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-950">
+          <ul className="flex flex-col gap-3">
             {applications.map((application) => (
-              <li key={application.id} className="flex items-center justify-between px-4 py-3 text-sm">
-                <span>
-                  <span className="font-medium text-zinc-900 dark:text-zinc-50">
-                    {application.propertyNickname}
+              <li
+                key={application.id}
+                className="rounded-xl border border-zinc-200 bg-white px-4 py-3 text-sm dark:border-zinc-800 dark:bg-zinc-950"
+              >
+                <div className="flex items-center justify-between">
+                  <span>
+                    <span className="font-medium text-zinc-900 dark:text-zinc-50">
+                      {application.propertyNickname}
+                    </span>
+                    <span className="ml-3 text-zinc-500">
+                      {formatInr(Number(application.proposedRent))} / month · {application.propertyCity}
+                    </span>
                   </span>
-                  <span className="ml-3 text-zinc-500">
-                    {formatInr(Number(application.proposedRent))} / month · {application.propertyCity}
+                  <span
+                    className={
+                      application.status === "approved"
+                        ? "text-emerald-600 dark:text-emerald-500"
+                        : application.status === "rejected" || application.status === "withdrawn"
+                          ? "text-zinc-400"
+                          : "text-amber-600"
+                    }
+                  >
+                    {STATUS_LABELS[application.status]}
                   </span>
-                </span>
-                <span
-                  className={
-                    application.status === "approved"
-                      ? "text-emerald-600 dark:text-emerald-500"
-                      : application.status === "rejected" || application.status === "withdrawn"
-                        ? "text-zinc-400"
-                        : "text-amber-600"
-                  }
-                >
-                  {STATUS_LABELS[application.status]}
-                </span>
+                </div>
+                <div className="mt-3">
+                  <MessageThread
+                    applicationId={application.id}
+                    messages={messagesByApplication.get(application.id) ?? []}
+                    viewerRole="tenant"
+                    counterpartyName="Owner"
+                    sendAction={sendApplicationMessage}
+                  />
+                </div>
               </li>
             ))}
           </ul>

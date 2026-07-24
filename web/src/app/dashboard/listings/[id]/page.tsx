@@ -3,9 +3,10 @@ import { notFound } from "next/navigation";
 import { apiFetch, ApiError } from "@/lib/api/client";
 import { formatInr } from "@/lib/currency";
 import { SITE_URL } from "@/lib/upi";
-import type { ListingApplicationsResponse, ListingApplicant, Property } from "@/lib/types";
+import type { ApplicationMessage, ListingApplicationsResponse, ListingApplicant, Property } from "@/lib/types";
+import { MessageThread } from "@/components/MessageThread";
 import { InviteLinkActions } from "../../tenants/invite-link";
-import { closeListing, decideApplication, requestApplicationKyc } from "../../actions";
+import { closeListing, decideApplication, requestApplicationKyc, sendApplicationMessage } from "../../actions";
 
 const STATUS_LABELS: Record<ListingApplicant["status"], string> = {
   under_review: "Under review",
@@ -34,6 +35,13 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
 
   const { listing, marketSignals, applicants } = data;
   const property: Property | null = await apiFetch(`/properties/${listing.propertyId}`).catch(() => null);
+  const messagesByApplicant = new Map(
+    await Promise.all(
+      applicants.map(
+        async (a) => [a.id, (await apiFetch(`/applications/${a.id}/messages`)) as ApplicationMessage[]] as const,
+      ),
+    ),
+  );
 
   return (
     <div className="flex flex-col gap-8">
@@ -172,6 +180,17 @@ export default async function ListingDetailPage({ params }: { params: Promise<{ 
                     .
                   </p>
                 )}
+              </div>
+
+              <div className="mt-4">
+                <MessageThread
+                  applicationId={applicant.id}
+                  listingId={listing.id}
+                  messages={messagesByApplicant.get(applicant.id) ?? []}
+                  viewerRole="owner"
+                  counterpartyName={applicant.applicantFullName ?? undefined}
+                  sendAction={sendApplicationMessage}
+                />
               </div>
             </li>
           ))}
