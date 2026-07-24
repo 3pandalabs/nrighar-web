@@ -3,6 +3,11 @@ import { redirect } from "next/navigation";
 import { apiGetCurrentUser } from "@/lib/api/client";
 import { tenantSignOut } from "./actions";
 
+const NAV_ITEMS = [
+  { href: "/tenant", label: "My profile" },
+  { href: "/tenant/listings", label: "Browse listings" },
+];
+
 export default async function TenantLayout({ children }: { children: React.ReactNode }) {
   const user = await apiGetCurrentUser();
 
@@ -29,6 +34,17 @@ export default async function TenantLayout({ children }: { children: React.React
             </form>
           </div>
         </div>
+        <nav className="mx-auto flex w-full max-w-3xl gap-1 overflow-x-auto px-6 pb-2">
+          {NAV_ITEMS.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="whitespace-nowrap rounded-full px-4 py-1.5 text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-50"
+            >
+              {item.label}
+            </Link>
+          ))}
+        </nav>
       </header>
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-8">{children}</main>
     </div>

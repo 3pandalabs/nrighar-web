@@ -1,9 +1,112 @@
 {
-  "id": "b272f79e-da51-4e17-9de4-6e55e9a509ba",
-  "prevId": "e693b89e-3e27-4cdb-9503-1072abcbd41a",
+  "id": "3302871a-1af3-494b-b3d3-b789942f1cf4",
+  "prevId": "9b90163e-31b4-4240-8664-595a492aaa99",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
+    "public.application_messages": {
+      "name": "application_messages",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "application_id": {
+          "name": "application_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sender_user_id": {
+          "name": "sender_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sender_role": {
+          "name": "sender_role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_application_messages_application": {
+          "name": "idx_application_messages_application",
+          "columns": [
+            {
+              "expression": "application_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "application_messages_application_id_property_applications_id_fk": {
+          "name": "application_messages_application_id_property_applications_id_fk",
+          "tableFrom": "application_messages",
+          "tableTo": "property_applications",
+          "columnsFrom": [
+            "application_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "application_messages_sender_user_id_users_id_fk": {
+          "name": "application_messages_sender_user_id_users_id_fk",
+          "tableFrom": "application_messages",
+          "tableTo": "users",
+          "columnsFrom": [
+            "sender_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "application_messages_sender_role_check": {
+          "name": "application_messages_sender_role_check",
+          "value": "\"application_messages\".\"sender_role\" in ('owner','tenant')"
+        },
+        "application_messages_body_check": {
+          "name": "application_messages_body_check",
+          "value": "length(\"application_messages\".\"body\") > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.documents": {
       "name": "documents",
       "schema": "",
@@ -824,6 +927,12 @@
           "notNull": true,
           "default": "'apartment'"
         },
+        "bedrooms": {
+          "name": "bedrooms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "notes": {
           "name": "notes",
           "type": "text",
@@ -877,6 +986,10 @@
         "properties_type_check": {
           "name": "properties_type_check",
           "value": "\"properties\".\"property_type\" in ('apartment','independent_house','villa','plot','commercial')"
+        },
+        "properties_bedrooms_check": {
+          "name": "properties_bedrooms_check",
+          "value": "\"properties\".\"bedrooms\" is null or \"properties\".\"bedrooms\" > 0"
         }
       },
       "isRLSEnabled": false
@@ -1122,6 +1235,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "min_lease_months": {
+          "name": "min_lease_months",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "status": {
           "name": "status",
           "type": "text",
@@ -1230,6 +1349,10 @@
         "property_listings_base_rent_check": {
           "name": "property_listings_base_rent_check",
           "value": "\"property_listings\".\"base_rent_ask\" > 0"
+        },
+        "property_listings_min_lease_check": {
+          "name": "property_listings_min_lease_check",
+          "value": "\"property_listings\".\"min_lease_months\" is null or \"property_listings\".\"min_lease_months\" > 0"
         }
       },
       "isRLSEnabled": false

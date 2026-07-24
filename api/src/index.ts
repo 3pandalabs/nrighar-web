@@ -18,6 +18,8 @@ import { intakeLinkRoutes } from "./routes/intakeLinks.js";
 import { profileShareRoutes } from "./routes/profileShares.js";
 import { storageRoutes } from "./routes/storage.js";
 import { tenantIntakeRoutes } from "./routes/tenantIntake.js";
+import { listingRoutes } from "./routes/listings.js";
+import { applicationRoutes } from "./routes/applications.js";
 
 const app = Fastify({ logger: true }).withTypeProvider<ZodTypeProvider>();
 app.setValidatorCompiler(validatorCompiler);
@@ -54,6 +56,8 @@ await app.register(intakeLinkRoutes);
 await app.register(profileShareRoutes);
 await app.register(storageRoutes);
 await app.register(tenantIntakeRoutes);
+await app.register(listingRoutes);
+await app.register(applicationRoutes);
 
 app.listen({ port: env.PORT, host: "0.0.0.0" }).catch((err) => {
   app.log.error(err);

@@ -90,3 +90,35 @@ export async function tenantSignOut() {
   await apiLogout();
   redirect("/");
 }
+
+export async function submitListingApplication(formData: FormData) {
+  await requireUser();
+
+  const listingId = String(formData.get("listing_id") ?? "");
+  const monthlyIncome = String(formData.get("monthly_income") ?? "").trim();
+  const profileHighlights = String(formData.get("profile_highlights") ?? "").trim();
+
+  await apiFetch(`/listings/${listingId}/applications`, {
+    method: "POST",
+    body: JSON.stringify({
+      proposedRent: Number(formData.get("proposed_rent") ?? 0),
+      moveInDate: String(formData.get("move_in_date") ?? ""),
+      monthlyIncome: monthlyIncome ? Number(monthlyIncome) : undefined,
+      profileHighlights: profileHighlights || undefined,
+    }),
+  });
+
+  revalidatePath("/tenant/listings");
+}
+
+export async function sendApplicationMessage(formData: FormData) {
+  await requireUser();
+
+  const applicationId = String(formData.get("application_id") ?? "");
+  const body = String(formData.get("body") ?? "").trim();
+  if (!body) return;
+
+  await apiFetch(`/applications/${applicationId}/messages`, { method: "POST", body: JSON.stringify({ body }) });
+
+  revalidatePath("/tenant/listings");
+}

@@ -31,6 +31,7 @@ export async function addProperty(formData: FormData) {
       state: String(formData.get("state") ?? "").trim(),
       pincode: String(formData.get("pincode") ?? "").trim(),
       propertyType: String(formData.get("property_type") ?? "apartment"),
+      bedrooms: formData.get("bedrooms") ? Number(formData.get("bedrooms")) : undefined,
       notes: String(formData.get("notes") ?? "").trim() || undefined,
     }),
   });
@@ -247,4 +248,63 @@ export async function getDownloadUrl(key: string): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+export async function openListing(formData: FormData) {
+  await requireUser();
+
+  await apiFetch("/listings", {
+    method: "POST",
+    body: JSON.stringify({
+      propertyId: String(formData.get("property_id") ?? ""),
+      baseRentAsk: Number(formData.get("base_rent_ask") ?? 0),
+      minLeaseMonths: formData.get("min_lease_months") ? Number(formData.get("min_lease_months")) : undefined,
+    }),
+  });
+
+  revalidatePath("/dashboard/listings");
+}
+
+export async function closeListing(formData: FormData) {
+  await requireUser();
+
+  const id = String(formData.get("id") ?? "");
+  await apiFetch(`/listings/${id}`, { method: "PATCH", body: JSON.stringify({ status: "closed" }) });
+
+  revalidatePath("/dashboard/listings");
+  revalidatePath(`/dashboard/listings/${id}`);
+}
+
+export async function requestApplicationKyc(formData: FormData) {
+  await requireUser();
+
+  const applicationId = String(formData.get("application_id") ?? "");
+  const listingId = String(formData.get("listing_id") ?? "");
+  await apiFetch(`/applications/${applicationId}/request-kyc`, { method: "POST" });
+
+  revalidatePath(`/dashboard/listings/${listingId}`);
+}
+
+export async function decideApplication(formData: FormData) {
+  await requireUser();
+
+  const applicationId = String(formData.get("application_id") ?? "");
+  const listingId = String(formData.get("listing_id") ?? "");
+  const status = String(formData.get("status") ?? "");
+  await apiFetch(`/applications/${applicationId}`, { method: "PATCH", body: JSON.stringify({ status }) });
+
+  revalidatePath(`/dashboard/listings/${listingId}`);
+}
+
+export async function sendApplicationMessage(formData: FormData) {
+  await requireUser();
+
+  const applicationId = String(formData.get("application_id") ?? "");
+  const listingId = String(formData.get("listing_id") ?? "");
+  const body = String(formData.get("body") ?? "").trim();
+  if (!body) return;
+
+  await apiFetch(`/applications/${applicationId}/messages`, { method: "POST", body: JSON.stringify({ body }) });
+
+  revalidatePath(`/dashboard/listings/${listingId}`);
 }

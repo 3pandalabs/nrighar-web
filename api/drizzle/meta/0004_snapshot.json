@@ -1,9 +1,112 @@
 {
-  "id": "b272f79e-da51-4e17-9de4-6e55e9a509ba",
-  "prevId": "e693b89e-3e27-4cdb-9503-1072abcbd41a",
+  "id": "712d2304-4b51-4e80-8ead-cd8bce56c6de",
+  "prevId": "3302871a-1af3-494b-b3d3-b789942f1cf4",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
+    "public.application_messages": {
+      "name": "application_messages",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "application_id": {
+          "name": "application_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sender_user_id": {
+          "name": "sender_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sender_role": {
+          "name": "sender_role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_application_messages_application": {
+          "name": "idx_application_messages_application",
+          "columns": [
+            {
+              "expression": "application_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "application_messages_application_id_property_applications_id_fk": {
+          "name": "application_messages_application_id_property_applications_id_fk",
+          "tableFrom": "application_messages",
+          "tableTo": "property_applications",
+          "columnsFrom": [
+            "application_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "application_messages_sender_user_id_users_id_fk": {
+          "name": "application_messages_sender_user_id_users_id_fk",
+          "tableFrom": "application_messages",
+          "tableTo": "users",
+          "columnsFrom": [
+            "sender_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "application_messages_sender_role_check": {
+          "name": "application_messages_sender_role_check",
+          "value": "\"application_messages\".\"sender_role\" in ('owner','tenant')"
+        },
+        "application_messages_body_check": {
+          "name": "application_messages_body_check",
+          "value": "length(\"application_messages\".\"body\") > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
     "public.documents": {
       "name": "documents",
       "schema": "",
@@ -251,6 +354,221 @@
         "intake_links_status_check": {
           "name": "intake_links_status_check",
           "value": "\"intake_links\".\"status\" in ('pending','submitted')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.kyc_verifications": {
+      "name": "kyc_verifications",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "document_source": {
+          "name": "document_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "document_id": {
+          "name": "document_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tenant_user_id": {
+          "name": "tenant_user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "doc_type": {
+          "name": "doc_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "is_valid_document": {
+          "name": "is_valid_document",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "extracted_fields": {
+          "name": "extracted_fields",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "quality_flags": {
+          "name": "quality_flags",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "official_check_status": {
+          "name": "official_check_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "official_check_detail": {
+          "name": "official_check_detail",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "error_message": {
+          "name": "error_message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_kyc_verifications_document": {
+          "name": "idx_kyc_verifications_document",
+          "columns": [
+            {
+              "expression": "document_source",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "document_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_kyc_verifications_tenant": {
+          "name": "idx_kyc_verifications_tenant",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_kyc_verifications_tenant_user": {
+          "name": "idx_kyc_verifications_tenant_user",
+          "columns": [
+            {
+              "expression": "tenant_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "kyc_verifications_owner_id_users_id_fk": {
+          "name": "kyc_verifications_owner_id_users_id_fk",
+          "tableFrom": "kyc_verifications",
+          "tableTo": "users",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "kyc_verifications_tenant_id_tenants_id_fk": {
+          "name": "kyc_verifications_tenant_id_tenants_id_fk",
+          "tableFrom": "kyc_verifications",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "kyc_verifications_tenant_user_id_users_id_fk": {
+          "name": "kyc_verifications_tenant_user_id_users_id_fk",
+          "tableFrom": "kyc_verifications",
+          "tableTo": "users",
+          "columnsFrom": [
+            "tenant_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "kyc_verifications_source_check": {
+          "name": "kyc_verifications_source_check",
+          "value": "\"kyc_verifications\".\"document_source\" in ('document','tenant_document')"
+        },
+        "kyc_verifications_status_check": {
+          "name": "kyc_verifications_status_check",
+          "value": "\"kyc_verifications\".\"status\" in ('pending','extracted','verified','manual_review','rejected','failed')"
+        },
+        "kyc_verifications_doc_type_check": {
+          "name": "kyc_verifications_doc_type_check",
+          "value": "\"kyc_verifications\".\"doc_type\" is null or \"kyc_verifications\".\"doc_type\" in ('pan_card','aadhaar_card','passport','unknown')"
+        },
+        "kyc_verifications_official_check_status_check": {
+          "name": "kyc_verifications_official_check_status_check",
+          "value": "\"kyc_verifications\".\"official_check_status\" is null or \"kyc_verifications\".\"official_check_status\" in ('verified','mismatch','not_configured','error')"
         }
       },
       "isRLSEnabled": false
@@ -824,6 +1142,12 @@
           "notNull": true,
           "default": "'apartment'"
         },
+        "bedrooms": {
+          "name": "bedrooms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "notes": {
           "name": "notes",
           "type": "text",
@@ -877,6 +1201,10 @@
         "properties_type_check": {
           "name": "properties_type_check",
           "value": "\"properties\".\"property_type\" in ('apartment','independent_house','villa','plot','commercial')"
+        },
+        "properties_bedrooms_check": {
+          "name": "properties_bedrooms_check",
+          "value": "\"properties\".\"bedrooms\" is null or \"properties\".\"bedrooms\" > 0"
         }
       },
       "isRLSEnabled": false
@@ -1122,6 +1450,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "min_lease_months": {
+          "name": "min_lease_months",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "status": {
           "name": "status",
           "type": "text",
@@ -1230,6 +1564,10 @@
         "property_listings_base_rent_check": {
           "name": "property_listings_base_rent_check",
           "value": "\"property_listings\".\"base_rent_ask\" > 0"
+        },
+        "property_listings_min_lease_check": {
+          "name": "property_listings_min_lease_check",
+          "value": "\"property_listings\".\"min_lease_months\" is null or \"property_listings\".\"min_lease_months\" > 0"
         }
       },
       "isRLSEnabled": false

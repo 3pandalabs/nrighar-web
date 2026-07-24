@@ -1,6 +1,6 @@
 {
-  "id": "b272f79e-da51-4e17-9de4-6e55e9a509ba",
-  "prevId": "e693b89e-3e27-4cdb-9503-1072abcbd41a",
+  "id": "9b90163e-31b4-4240-8664-595a492aaa99",
+  "prevId": "b272f79e-da51-4e17-9de4-6e55e9a509ba",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -824,6 +824,12 @@
           "notNull": true,
           "default": "'apartment'"
         },
+        "bedrooms": {
+          "name": "bedrooms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "notes": {
           "name": "notes",
           "type": "text",
@@ -877,6 +883,10 @@
         "properties_type_check": {
           "name": "properties_type_check",
           "value": "\"properties\".\"property_type\" in ('apartment','independent_house','villa','plot','commercial')"
+        },
+        "properties_bedrooms_check": {
+          "name": "properties_bedrooms_check",
+          "value": "\"properties\".\"bedrooms\" is null or \"properties\".\"bedrooms\" > 0"
         }
       },
       "isRLSEnabled": false
@@ -1122,6 +1132,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "min_lease_months": {
+          "name": "min_lease_months",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "status": {
           "name": "status",
           "type": "text",
@@ -1230,6 +1246,10 @@
         "property_listings_base_rent_check": {
           "name": "property_listings_base_rent_check",
           "value": "\"property_listings\".\"base_rent_ask\" > 0"
+        },
+        "property_listings_min_lease_check": {
+          "name": "property_listings_min_lease_check",
+          "value": "\"property_listings\".\"min_lease_months\" is null or \"property_listings\".\"min_lease_months\" > 0"
         }
       },
       "isRLSEnabled": false
