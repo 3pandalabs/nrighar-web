@@ -47,14 +47,19 @@ export async function finalizeIntakeSubmission(input: {
     })
     .returning({ id: schema.tenants.id });
 
+  const documentRows: { id: string; storagePath: string }[] = [];
   for (const f of input.files) {
-    await db.insert(schema.documents).values({
-      ownerId: input.ownerId,
-      propertyId: input.propertyId ?? undefined,
-      docType: "kyc",
-      title: f.title,
-      storagePath: f.key,
-    });
+    const [row] = await db
+      .insert(schema.documents)
+      .values({
+        ownerId: input.ownerId,
+        propertyId: input.propertyId ?? undefined,
+        docType: "kyc",
+        title: f.title,
+        storagePath: f.key,
+      })
+      .returning({ id: schema.documents.id, storagePath: schema.documents.storagePath });
+    documentRows.push(row);
   }
 
   await db
@@ -62,5 +67,5 @@ export async function finalizeIntakeSubmission(input: {
     .set({ status: "submitted", tenantId: tenant.id, submittedAt: new Date() })
     .where(eq(schema.intakeLinks.id, input.token));
 
-  return { ok: true };
+  return { ok: true, tenantId: tenant.id, ownerId: input.ownerId, documents: documentRows };
 }

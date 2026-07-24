@@ -13,3 +13,4 @@ export * from "./intakeLinks.js";
 export * from "./payLinks.js";
 export * from "./auth.js";
 export * from "./tenantIntake.js";
+export * from "./kyc.js";

@@ -10,7 +10,6 @@ type TenantProfilePatchBody = {
   email?: string;
   currentCity?: string;
   employer?: string;
-  kycStatus?: "pending" | "submitted" | "verified";
 };
 
 type TenantDocBody = {

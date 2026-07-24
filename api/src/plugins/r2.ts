@@ -1,3 +1,4 @@
+import type { Readable } from "node:stream";
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { env } from "../env.js";
@@ -42,6 +43,19 @@ export async function putObject(key: string, body: Buffer, contentType?: string)
       ContentType: contentType,
     }),
   );
+}
+
+// Server-side read of raw bytes — used by the KYC extraction activity, which
+// has to hand the file to a vision model rather than a browser, so a
+// presigned URL (meant for a client) doesn't apply here.
+export async function getObject(key: string): Promise<{ buffer: Buffer; contentType?: string }> {
+  const res = await r2.send(new GetObjectCommand({ Bucket: env.R2_BUCKET, Key: key }));
+  const stream = res.Body as Readable;
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return { buffer: Buffer.concat(chunks), contentType: res.ContentType };
 }
 
 // Best-effort object delete — called when a documents/tenant_documents row is
