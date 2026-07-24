@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
+    "db:migrate:prod": "node dist/db/migrate.js",
     "worker:dev": "tsx watch src/temporal/worker.ts",
     "worker:start": "node dist/temporal/worker.js",
     "temporal:ping": "tsx src/temporal/triggerPing.ts"
