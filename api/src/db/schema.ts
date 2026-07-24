@@ -139,6 +139,85 @@ export const leases = pgTable(
   ],
 );
 
+// An owner opens ONE listing per property at a time (partial unique index
+// below) to invite competing applications. baseRentAsk is the asking rent
+// applications are compared against — rentVariancePct in propertyApplications
+// is always derived from this at read/write time, never trusted from a
+// client.
+export const propertyListings = pgTable(
+  "property_listings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    propertyId: uuid("property_id")
+      .notNull()
+      .references(() => properties.id, { onDelete: "cascade" }),
+    baseRentAsk: numeric("base_rent_ask", { precision: 12, scale: 2 }).notNull(),
+    status: text("status").notNull().default("open"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("idx_property_listings_owner").on(t.ownerId),
+    index("idx_property_listings_property").on(t.propertyId),
+    uniqueIndex("uq_property_listings_one_open_per_property")
+      .on(t.propertyId)
+      .where(sql`${t.status} = 'open'`),
+    check("property_listings_status_check", sql`${t.status} in ('open','closed')`),
+    check("property_listings_base_rent_check", sql`${t.baseRentAsk} > 0`),
+  ],
+);
+
+// One row per tenant-user's offer on a listing. No protected-class fields
+// exist here (or anywhere in this schema) by design — Fair Housing
+// compliance for the owner-facing comparison view is enforced by having
+// nothing but financial/timeline/verification data to sort or filter on in
+// the first place, not by a runtime filter. monthlyIncome is self-reported
+// and optional; there's no credit-score field — no bureau integration
+// exists to populate one (see ROUTES.md).
+export const propertyApplications = pgTable(
+  "property_applications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    listingId: uuid("listing_id")
+      .notNull()
+      .references(() => propertyListings.id, { onDelete: "cascade" }),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    applicantUserId: uuid("applicant_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    proposedRent: numeric("proposed_rent", { precision: 12, scale: 2 }).notNull(),
+    moveInDate: date("move_in_date").notNull(),
+    monthlyIncome: numeric("monthly_income", { precision: 12, scale: 2 }),
+    profileHighlights: text("profile_highlights"),
+    status: text("status").notNull().default("under_review"),
+    // Set by the request-kyc action — points at the intakeLinks row minted
+    // to reuse the existing document-verification pipeline (see
+    // temporal/activities/applications.ts).
+    intakeLinkId: uuid("intake_link_id").references(() => intakeLinks.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("idx_property_applications_listing").on(t.listingId),
+    index("idx_property_applications_owner").on(t.ownerId),
+    index("idx_property_applications_applicant").on(t.applicantUserId),
+    // One active (not yet decided) application per applicant per listing —
+    // they can re-apply after a rejection/withdrawal, just not stack offers.
+    uniqueIndex("uq_property_applications_active_per_applicant")
+      .on(t.listingId, t.applicantUserId)
+      .where(sql`${t.status} in ('under_review','kyc_requested')`),
+    check(
+      "property_applications_status_check",
+      sql`${t.status} in ('under_review','kyc_requested','approved','rejected','withdrawn')`,
+    ),
+    check("property_applications_rent_check", sql`${t.proposedRent} > 0`),
+  ],
+);
+
 export const rentPayments = pgTable(
   "rent_payments",
   {
